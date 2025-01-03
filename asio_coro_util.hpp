@@ -222,15 +222,15 @@ class AsioExecutor: public async_simple::Executor
 template<typename T> requires(!std::is_reference<T>::value) struct AsioCallbackAwaiter
 {
     private:
-        CallbackFunction m_callback_function;
+        CallbackFunction m_cb;
         T m_result;
 
     public:
         using CallbackFunction = std::function<void(std::coroutine_handle<>, std::function<void(T)>)>;
 
     public:
-        AsioCallbackAwaiter(CallbackFunction callback_function)
-            : m_callback_function(std::move(callback_function))
+        AsioCallbackAwaiter(CallbackFunction cb)
+            : m_cb(std::move(cb))
         {}
 
         bool await_ready() noexcept
@@ -240,7 +240,7 @@ template<typename T> requires(!std::is_reference<T>::value) struct AsioCallbackA
 
         void await_suspend(std::coroutine_handle<> handle)
         {
-            m_callback_function(handle, [this](T t) { m_result = std::move(t); });
+            m_cb(handle, [this](T t) { m_result = std::move(t); });
         }
 
         auto coAwait(async_simple::Executor *executor) noexcept
