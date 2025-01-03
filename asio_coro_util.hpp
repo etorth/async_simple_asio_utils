@@ -240,7 +240,10 @@ template<typename T> requires(!std::is_reference<T>::value) struct AsioCallbackA
 
         void await_suspend(std::coroutine_handle<> handle)
         {
-            m_cb(handle, [this](T t) { m_result = std::move(t); });
+            m_cb(handle, [this](T t)
+            {
+                m_result = std::move(t);
+            });
         }
 
         auto coAwait(async_simple::Executor *executor) noexcept
