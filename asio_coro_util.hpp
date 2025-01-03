@@ -26,13 +26,13 @@
 #include <cstdint>
 #include "asio.hpp"
 
-template <typename Arg, typename Derived> class callback_awaitor_base
+template<typename Arg, typename Derived> class callback_awaitor_base
 {
     private:
         std::coroutine_handle<> m_coro;
 
     private:
-        template <typename Op> class callback_awaitor_impl
+        template<typename Op> class callback_awaitor_impl
         {
             private:
                 Derived &awaitor;
@@ -88,13 +88,13 @@ template <typename Arg, typename Derived> class callback_awaitor_base
                 awaitor_handler & operator=(const awaitor_handler & ) = default;
 
             public:
-                template <typename... Args> void set_value_then_resume(Args &&...args) const
+                template<typename... Args> void set_value_then_resume(Args &&...args) const
                 {
                     set_value(std::forward<Args>(args)...);
                     resume();
                 }
 
-                template <typename... Args> void set_value(Args &&...args) const
+                template<typename... Args> void set_value(Args &&...args) const
                 {
                     if constexpr (!std::is_void_v<Arg>){
                         obj->m_arg = {std::forward<Args>(args)...};
@@ -108,13 +108,13 @@ template <typename Arg, typename Derived> class callback_awaitor_base
         };
 
     public:
-        template <typename Op> callback_awaitor_impl<Op> await_resume(Op &&op) noexcept
+        template<typename Op> callback_awaitor_impl<Op> await_resume(Op &&op) noexcept
         {
             return callback_awaitor_impl<Op>{static_cast<Derived &>(*this), op};
         }
 };
 
-template <typename Arg> class callback_awaitor: public callback_awaitor_base<Arg, callback_awaitor<Arg>>
+template<typename Arg> class callback_awaitor: public callback_awaitor_base<Arg, callback_awaitor<Arg>>
 {
     private:
         friend class callback_awaitor_base<Arg, callback_awaitor<Arg>>;
@@ -123,7 +123,7 @@ template <typename Arg> class callback_awaitor: public callback_awaitor_base<Arg
         Arg m_arg;
 };
 
-template <> class callback_awaitor<void>: public callback_awaitor_base<void, callback_awaitor<void>>
+template<> class callback_awaitor<void>: public callback_awaitor_base<void, callback_awaitor<void>>
 {};
 
 class period_timer : public asio::steady_timer
@@ -219,7 +219,7 @@ class AsioExecutor: public async_simple::Executor
         }
 };
 
-template <typename T> requires(!std::is_reference<T>::value) struct AsioCallbackAwaiter
+template<typename T> requires(!std::is_reference<T>::value) struct AsioCallbackAwaiter
 {
     private:
         CallbackFunction m_callback_function;
@@ -299,7 +299,7 @@ template<typename Socket, typename AsioBuffer> inline async_simple::coro::Lazy<s
     };
 }
 
-template <typename Socket, typename AsioBuffer> inline async_simple::coro::Lazy<std::pair<std::error_code, size_t>> async_read_until(Socket &socket, AsioBuffer &buffer, asio::string_view delim) noexcept
+template<typename Socket, typename AsioBuffer> inline async_simple::coro::Lazy<std::pair<std::error_code, size_t>> async_read_until(Socket &socket, AsioBuffer &buffer, asio::string_view delim) noexcept
 {
     co_return co_await AsioCallbackAwaiter<std::pair<std::error_code, size_t>>
     {
@@ -314,7 +314,7 @@ template <typename Socket, typename AsioBuffer> inline async_simple::coro::Lazy<
     };
 }
 
-template <typename Socket, typename AsioBuffer> inline async_simple::coro::Lazy<std::pair<std::error_code, size_t>> async_write(Socket &socket, AsioBuffer &&buffer) noexcept
+template<typename Socket, typename AsioBuffer> inline async_simple::coro::Lazy<std::pair<std::error_code, size_t>> async_write(Socket &socket, AsioBuffer &&buffer) noexcept
 {
     co_return co_await AsioCallbackAwaiter<std::pair<std::error_code, size_t>>
     {
