@@ -84,9 +84,10 @@ template <typename Arg, typename Derived> class callback_awaitor_base
 
                 awaitor_handler            (      awaitor_handler &&) = default;
                 awaitor_handler            (const awaitor_handler & ) = default;
-                awaitor_handler & operator=(const awaitor_handler  &) = default;
                 awaitor_handler & operator=(      awaitor_handler &&) = default;
+                awaitor_handler & operator=(const awaitor_handler & ) = default;
 
+            public:
                 template <typename... Args> void set_value_then_resume(Args &&...args) const
                 {
                     set_value(std::forward<Args>(args)...);
