@@ -36,33 +36,39 @@
 // This section contains definitions of the parts of <coroutine> header needed by
 // the lowering and implementation below.
 
-struct __coroutine_state {
-    using __resume_fn = __coroutine_state* (__coroutine_state*);
-    using __destroy_fn = void (__coroutine_state*);
+struct __coroutine_state
+{
+    using  __resume_fn = __coroutine_state* (__coroutine_state*);
+    using __destroy_fn =              void  (__coroutine_state*);
 
-    __resume_fn* __resume;
+     __resume_fn* __resume;
     __destroy_fn* __destroy;
 
-    static __coroutine_state* __noop_resume(__coroutine_state* __state) noexcept {
+    static __coroutine_state * __noop_resume(__coroutine_state* __state) noexcept
+    {
         return __state;
     }
 
-    static void __noop_destroy(__coroutine_state*) noexcept {}
+    static void __noop_destroy(__coroutine_state*) noexcept
+    {
+    }
 
     static const __coroutine_state __noop_coroutine;
 };
 
-inline const __coroutine_state __coroutine_state::__noop_coroutine{
+inline const __coroutine_state __coroutine_state::__noop_coroutine
+{
     &__coroutine_state::__noop_resume,
     &__coroutine_state::__noop_destroy
 };
 
-template<typename Promise>
-struct __coroutine_state_with_promise : __coroutine_state {
-    __coroutine_state_with_promise() noexcept {}
-    ~__coroutine_state_with_promise() {}
+template<typename Promise> struct __coroutine_state_with_promise: __coroutine_state
+{
+     __coroutine_state_with_promise() noexcept {}
+    ~__coroutine_state_with_promise()          {}
 
-    union {
+    union
+    {
         Promise __promise;
     };
 };
