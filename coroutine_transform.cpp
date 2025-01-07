@@ -552,14 +552,13 @@ task g(int x)
 /////
 //  The "resume" function
 
-__coroutine_state* __g_resume(__coroutine_state* s)
+__coroutine_state *__g_resume(__coroutine_state *s)
 {
-    auto* state = static_cast<__g_state*>(s);
-
+    auto* state = static_cast<__g_state *>(s);
     std::coroutine_handle<void> coro_to_resume;
 
-    try {
-        switch (state->__suspend_point) {
+    try{
+        switch(state->__suspend_point){
             case 0: goto suspend_point_0;
             case 1: goto suspend_point_1; // <-- add new jump-table entry
             default: std::unreachable();
@@ -573,27 +572,26 @@ suspend_point_0:
 
         //  int fx = co_await f(x);
         {
-            state->__s1.__tmp2.construct_from([&] {
-                    return f(state->x);
-                    });
+            state->__s1.__tmp2.construct_from([&]()
+            {
+                return f(state->x);
+            });
             destructor_guard tmp2_dtor{state->__s1.__tmp2};
 
-            state->__s1.__tmp3.construct_from([&] {
-                    return static_cast<task&&>(state->__s1.__tmp2.get()).operator co_await();
-                    });
+            state->__s1.__tmp3.construct_from([&]()
+            {
+                return static_cast<task &&>(state->__s1.__tmp2.get()).operator co_await();
+            });
             destructor_guard tmp3_dtor{state->__s1.__tmp3};
 
-            if (!state->__s1.__tmp3.get().await_ready()) {
+            if(!state->__s1.__tmp3.get().await_ready()){
                 state->__suspend_point = 1;
-
-                auto h = state->__s1.__tmp3.get().await_suspend(
-                        std::coroutine_handle<__g_promise_t>::from_promise(state->__promise));
+                auto h = state->__s1.__tmp3.get().await_suspend(std::coroutine_handle<__g_promise_t>::from_promise(state->__promise));
 
                 // A coroutine suspends without exiting scopes - so cancel the destructor-guards.
                 tmp3_dtor.cancel();
                 tmp2_dtor.cancel();
-
-                return static_cast<__coroutine_state*>(h.address());
+                return static_cast<__coroutine_state *>(h.address());
             }
 
             // Don't exit the scope here.
@@ -605,7 +603,8 @@ suspend_point_0:
         }
 
 suspend_point_1:
-        int fx = [&]() -> decltype(auto) {
+        int fx = [&]() -> decltype(auto)
+        {
             destructor_guard tmp2_dtor{state->__s1.__tmp2};
             destructor_guard tmp3_dtor{state->__s1.__tmp3};
             return state->__s1.__tmp3.get().await_resume();
@@ -614,7 +613,8 @@ suspend_point_1:
         //  co_return fx * fx;
         state->__promise.return_value(fx * fx);
         goto final_suspend;
-    } catch (...) {
+    }
+    catch (...){
         state->__promise.unhandled_exception();
         goto final_suspend;
     }
