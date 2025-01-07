@@ -22,7 +22,7 @@
 // commented out it is easier to see where the compiler is inserting calls
 // to these methods as they won't be inlined.
 
-//#define ENABLE_TASK_DEFINITIONS
+#define ENABLE_TASK_DEFINITIONS
 
 #include <cstddef>
 #include <concepts>
