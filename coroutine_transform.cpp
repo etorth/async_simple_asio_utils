@@ -38,11 +38,11 @@
 
 struct __coroutine_state
 {
-    using  __resume_fn = __coroutine_state* (__coroutine_state*);
-    using __destroy_fn =              void  (__coroutine_state*);
+    using  __resume_fn = __coroutine_state* (__coroutine_state *);
+    using __destroy_fn =              void  (__coroutine_state *);
 
-     __resume_fn* __resume;
-    __destroy_fn* __destroy;
+     __resume_fn *__resume;
+    __destroy_fn *__destroy;
 
     static const __coroutine_state __noop_coroutine;
 
@@ -134,112 +134,132 @@ namespace std
             }
     };
 
-    template<typename Promise>
-        class coroutine_handle {
+    template<typename Promise> class coroutine_handle
+    {
+        private:
             using state_t = __coroutine_state_with_promise<Promise>;
-            public:
-            coroutine_handle() noexcept = default;
-            coroutine_handle(const coroutine_handle&) noexcept = default;
-            coroutine_handle& operator=(const coroutine_handle&) noexcept = default;
 
-            operator coroutine_handle<void>() const noexcept {
+        private:
+            state_t * state_;
+
+        public:
+            coroutine_handle            (                        ) noexcept = default;
+            coroutine_handle            (const coroutine_handle &) noexcept = default;
+            coroutine_handle & operator=(const coroutine_handle &) noexcept = default;
+
+        public:
+            operator coroutine_handle<void>() const noexcept
+            {
                 return coroutine_handle<void>::from_address(address());
             }
 
-            explicit operator bool() const noexcept {
+            explicit operator bool() const noexcept
+            {
                 return state_ != nullptr;
             }
 
-            friend bool operator==(coroutine_handle a, coroutine_handle b) noexcept {
+            friend bool operator==(coroutine_handle a, coroutine_handle b) noexcept
+            {
                 return a.state_ == b.state_;
             }
 
-            void* address() const {
-                return static_cast<void*>(static_cast<__coroutine_state*>(state_));
+            void * address() const
+            {
+                return static_cast<void*>(static_cast<__coroutine_state *>(state_));
             }
 
-            static coroutine_handle from_address(void* ptr) {
+            static coroutine_handle from_address(void * ptr)
+            {
                 coroutine_handle h;
-                h.state_ = static_cast<state_t*>(static_cast<__coroutine_state*>(ptr));
+                h.state_ = static_cast<state_t*>(static_cast<__coroutine_state *>(ptr));
                 return h;
             }
 
-            Promise& promise() const {
+            Promise & promise() const
+            {
                 return state_->__promise;
             }
 
-            static coroutine_handle from_promise(Promise& promise) {
+            static coroutine_handle from_promise(Promise & promise)
+            {
                 coroutine_handle h;
 
-                // We know the address of the __promise member, so calculate the
-                // address of the coroutine-state by subtracting the offset of
-                // the __promise field from this address.
-                h.state_ = reinterpret_cast<state_t*>(
-                        reinterpret_cast<unsigned char*>(std::addressof(promise)) -
-                        offsetof(state_t, __promise));
-
+                // We know the address of the __promise member
+                // so calculate the address of the coroutine-state by subtracting the offset of the __promise field from this address
+                h.state_ = reinterpret_cast<state_t *>(reinterpret_cast<unsigned char *>(std::addressof(promise)) - offsetof(state_t, __promise));
                 return h;
             }
 
             // Define these in terms of their `coroutine_handle<void>` implementations
 
-            void resume() const {
+            void resume() const
+            {
                 static_cast<coroutine_handle<void>>(*this).resume();
             }
 
-            void destroy() const {
+            void destroy() const
+            {
                 static_cast<coroutine_handle<void>>(*this).destroy();
             }
 
-            bool done() const {
+            bool done() const
+            {
                 return static_cast<coroutine_handle<void>>(*this).done();
             }
-
-            private:
-            state_t* state_;
-        };
+    };
 
     struct noop_coroutine_promise {};
-
-    using noop_coroutine_handle = coroutine_handle<noop_coroutine_promise>;
+    using  noop_coroutine_handle = coroutine_handle<noop_coroutine_promise>;
 
     noop_coroutine_handle noop_coroutine() noexcept;
 
-    template<>
-        class coroutine_handle<noop_coroutine_promise> {
-            public:
-                constexpr coroutine_handle(const coroutine_handle&) noexcept = default;
-                constexpr coroutine_handle& operator=(const coroutine_handle&) noexcept = default;
+    template<> class coroutine_handle<noop_coroutine_promise>
+    {
+        public:
+            constexpr coroutine_handle            (const coroutine_handle&) noexcept = default;
+            constexpr coroutine_handle & operator=(const coroutine_handle&) noexcept = default;
 
-                constexpr explicit operator bool() noexcept { return true; }
+        public:
+            constexpr explicit operator bool() noexcept
+            {
+                return true;
+            }
 
-                constexpr friend bool operator==(coroutine_handle, coroutine_handle) noexcept {
-                    return true;
-                }
+            constexpr friend bool operator==(coroutine_handle, coroutine_handle) noexcept
+            {
+                return true;
+            }
 
-                operator coroutine_handle<void>() const noexcept {
-                    return coroutine_handle<void>::from_address(address());
-                }
+            operator coroutine_handle<void>() const noexcept
+            {
+                return coroutine_handle<void>::from_address(address());
+            }
 
-                noop_coroutine_promise& promise() const noexcept {
-                    static noop_coroutine_promise promise;
-                    return promise;
-                }
+            noop_coroutine_promise & promise() const noexcept
+            {
+                static noop_coroutine_promise promise;
+                return promise;
+            }
 
-                constexpr void resume() const noexcept {}
-                constexpr void destroy() const noexcept {}
-                constexpr bool done() const noexcept { return false; }
+            constexpr void resume () const noexcept {}
+            constexpr void destroy() const noexcept {}
+            constexpr bool done   () const noexcept { return false; }
 
-                constexpr void* address() const noexcept {
-                    return const_cast<__coroutine_state*>(&__coroutine_state::__noop_coroutine);
-                }
-            private:
-                constexpr coroutine_handle() noexcept = default;
+        public:
+            constexpr void * address() const noexcept
+            {
+                return const_cast<__coroutine_state *>(std::addressof(__coroutine_state::__noop_coroutine));
+            }
 
-                friend noop_coroutine_handle noop_coroutine() noexcept {
-                    return {};;
-                }
-        };
+        private:
+            constexpr coroutine_handle() noexcept = default;
+
+        private:
+            friend noop_coroutine_handle noop_coroutine() noexcept
+            {
+                return {};
+            }
+    };
 
     struct suspend_always {
         constexpr suspend_always() noexcept = default;
