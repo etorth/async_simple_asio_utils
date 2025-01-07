@@ -487,38 +487,41 @@ void                __g_destroy(__coroutine_state *);
 
 struct __g_state : __coroutine_state_with_promise<__g_promise_t>
 {
-    __g_state(int&& x)
-        : x(static_cast<int&&>(x)) {
-            // Initialise the function-pointers used by coroutine_handle::resume/destroy/done().
-            this->__resume = &__g_resume;
-            this->__destroy = &__g_destroy;
-
-            // Use placement-new to initialise the promise object in the base-class
-            // after we've initialised the argument copies.
-            ::new ((void*)std::addressof(this->__promise))
-                __g_promise_t(construct_promise<__g_promise_t>(this->x));
-        }
-
-    ~__g_state() {
-        this->__promise.~__g_promise_t();
-    }
-
     int __suspend_point = 0;
 
     // Argument copies
     int x;
 
     // Local variables/temporaries
-    struct __scope1 {
-        manual_lifetime<task> __tmp2;
+    struct __scope1
+    {
+        manual_lifetime<task         > __tmp2;
         manual_lifetime<task::awaiter> __tmp3;
     };
 
-    union {
+    union
+    {
         manual_lifetime<std::suspend_always> __tmp1;
         __scope1 __s1;
         manual_lifetime<task::promise_type::final_awaiter> __tmp4;
     };
+
+    __g_state(int&& x)
+        : x(static_cast<int &&>(x))
+    {
+            // Initialise the function-pointers used by coroutine_handle::resume/destroy/done().
+            this-> __resume = & __g_resume;
+            this->__destroy = &__g_destroy;
+
+            // Use placement-new to initialise the promise object in the base-class
+            // after we've initialised the argument copies.
+            ::new ((void*)std::addressof(this->__promise)) __g_promise_t(construct_promise<__g_promise_t>(this->x));
+    }
+
+    ~__g_state()
+    {
+        this->__promise.~__g_promise_t();
+    }
 };
 
 /////
@@ -527,21 +530,23 @@ struct __g_state : __coroutine_state_with_promise<__g_promise_t>
 task g(int x)
 {
     std::unique_ptr<__g_state> state(new __g_state(static_cast<int&&>(x)));
-    decltype(auto) return_value = state->__promise.get_return_object();
+    decltype(auto) return_obj = state->__promise.get_return_object();
 
-    state->__tmp1.construct_from([&]() -> decltype(auto) {
-            return state->__promise.initial_suspend();
-            });
-    if (!state->__tmp1.get().await_ready()) {
-        state->__tmp1.get().await_suspend(
-                std::coroutine_handle<__g_promise_t>::from_promise(state->__promise));
+    state->__tmp1.construct_from([&]() -> decltype(auto)
+    {
+        return state->__promise.initial_suspend();
+    });
+
+    if(!state->__tmp1.get().await_ready()){
+        state->__tmp1.get().await_suspend(std::coroutine_handle<__g_promise_t>::from_promise(state->__promise));
         state.release();
         // fall through to return statement below.
-    } else {
+    }
+    else{
         // Coroutine did not suspend. Start executing the body immediately.
         __g_resume(state.release());
     }
-    return return_value;
+    return return_obj;
 }
 
 /////
