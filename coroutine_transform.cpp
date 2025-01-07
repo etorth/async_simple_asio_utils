@@ -24,11 +24,11 @@
 
 #define ENABLE_TASK_DEFINITIONS
 
-#include <cstddef>
-#include <concepts>
-#include <type_traits>
-#include <memory>
-#include <utility>
+#include<cstddef>
+#include<concepts>
+#include<type_traits>
+#include<memory>
+#include<utility>
 
 //////////////////////////////////////////////////
 // <coroutine> header definitions
@@ -261,153 +261,125 @@ namespace std
             }
     };
 
-    struct suspend_always {
+    struct suspend_always
+    {
         constexpr suspend_always() noexcept = default;
-        constexpr bool await_ready() const noexcept { return false; }
+
+        constexpr bool await_ready  ()                   const noexcept { return false; }
         constexpr void await_suspend(coroutine_handle<>) const noexcept {}
-        constexpr void await_resume() const noexcept {}
+        constexpr void await_resume ()                   const noexcept {}
     };
 }
 
 ////////////////////////////////////////////////////////////////////////
 // Definition of the 'task' coroutine type used by this example
 
-#include <variant>
-#include <exception>
+#include<variant>
+#include<exception>
 
-class task {
+class task
+{
     public:
         struct awaiter;
 
-        class promise_type {
-            public:
-                promise_type() noexcept;
-                ~promise_type();
-
-                struct final_awaiter {
-                    bool await_ready() noexcept;
-                    std::coroutine_handle<> await_suspend(std::coroutine_handle<promise_type>) noexcept;
-                    void await_resume() noexcept;
-                };
-
-                task get_return_object() noexcept;
-                std::suspend_always initial_suspend() noexcept;
-                final_awaiter final_suspend() noexcept;
-                void unhandled_exception() noexcept;
-                void return_value(int result) noexcept;
-
+    public:
+        class promise_type
+        {
             private:
                 friend task::awaiter;
                 std::coroutine_handle<> continuation_;
                 std::variant<std::monostate, int, std::exception_ptr> result_;
+
+            public:
+                 promise_type() noexcept {}
+                ~promise_type()          {}
+
+            public:
+                struct final_awaiter
+                {
+                    bool                    await_ready  ()                                      noexcept { return false; }
+                    std::coroutine_handle<> await_suspend(std::coroutine_handle<promise_type> h) noexcept { return h.promise().continuation_; }
+                    void                    await_resume ()                                      noexcept {}
+                };
+
+                task get_return_object() noexcept
+                {
+                    return task{std::coroutine_handle<task::promise_type>::from_promise(*this)};
+                }
+
+                std::suspend_always initial_suspend() noexcept { return {}; }
+                final_awaiter         final_suspend() noexcept { return {}; }
+
+                void return_value       (int result) noexcept { result_ = result;                   }
+                void unhandled_exception()           noexcept { result_ = std::current_exception(); }
         };
-
-        task(task&& t) noexcept;
-        ~task();
-        task& operator=(task&& t) noexcept;
-
-        struct awaiter {
-            explicit awaiter(std::coroutine_handle<promise_type> h) noexcept;
-            bool await_ready() noexcept;
-            std::coroutine_handle<promise_type> await_suspend(std::coroutine_handle<> h) noexcept;
-            int await_resume();
-            private:
-            std::coroutine_handle<promise_type> coro_;
-        };
-
-        awaiter operator co_await() && noexcept;
 
     private:
-        explicit task(std::coroutine_handle<promise_type> h) noexcept;
-
         std::coroutine_handle<promise_type> coro_;
+
+    public:
+        task(task && t) noexcept
+            : coro_(std::exchange(t.coro_, {}))
+        {}
+
+        ~task()
+        {
+            if(coro_){
+                coro_.destroy();
+            }
+        }
+
+        task & operator=(task && t) noexcept
+        {
+            task tmp = std::move(t);
+            using std::swap;
+
+            swap(coro_, tmp.coro_);
+            return *this;
+        }
+
+        struct awaiter
+        {
+            private:
+                std::coroutine_handle<promise_type> coro_;
+
+            public:
+                explicit awaiter(std::coroutine_handle<promise_type> h) noexcept
+                    : coro_(h)
+                {}
+
+                bool await_ready() noexcept
+                {
+                    return false;
+                }
+
+                std::coroutine_handle<promise_type> await_suspend(std::coroutine_handle<> h) noexcept
+                {
+                    coro_.promise().continuation_ = h;
+                    return coro_;
+                }
+
+                int await_resume()
+                {
+                    if(coro_.promise().result_.index() == 2){
+                        std::rethrow_exception(std::get<2>(std::move(coro_.promise().result_)));
+                    }
+                    else{
+                        return std::get<1>(coro_.promise().result_);
+                    }
+                }
+        };
+
+        awaiter operator co_await() && noexcept
+        {
+            return awaiter{coro_};
+        }
+
+    private:
+        explicit task(std::coroutine_handle<promise_type> h) noexcept
+            : coro_(h)
+        {}
 };
-
-// Allow conditionally including the definitions of the methods of the task type.
-#ifdef ENABLE_TASK_DEFINITIONS
-
-inline task::promise_type::promise_type() noexcept {}
-
-inline task::promise_type::~promise_type() {}
-
-inline bool task::promise_type::final_awaiter::await_ready() noexcept {
-    return false;
-}
-
-inline std::coroutine_handle<> task::promise_type::final_awaiter::await_suspend(
-        std::coroutine_handle<task::promise_type> h) noexcept {
-    return h.promise().continuation_;
-}
-
-inline void task::promise_type::final_awaiter::await_resume() noexcept {}
-
-inline task task::promise_type::get_return_object() noexcept {
-    return task{std::coroutine_handle<task::promise_type>::from_promise(*this)};
-}
-
-inline std::suspend_always task::promise_type::initial_suspend() noexcept {
-    return {};
-}
-
-inline task::promise_type::final_awaiter task::promise_type::final_suspend() noexcept {
-    return {};
-}
-
-inline void task::promise_type::unhandled_exception() noexcept {
-    result_.emplace<2>(std::current_exception());
-}
-
-inline void task::promise_type::return_value(int value) noexcept {
-    result_.emplace<1>(value);
-}
-
-inline task::task(task&& t) noexcept
-: coro_(std::exchange(t.coro_, {}))
-{}
-
-inline task::~task() {
-    if (coro_) {
-        coro_.destroy();
-    }
-}
-
-inline task& task::operator=(task&& t) noexcept {
-    task tmp = std::move(t);
-    using std::swap;
-    swap(coro_, tmp.coro_);
-    return *this;
-}
-
-inline task::awaiter::awaiter(std::coroutine_handle<promise_type> h) noexcept
-: coro_(h)
-{}
-
-inline bool task::awaiter::await_ready() noexcept {
-    return false;
-}
-
-inline std::coroutine_handle<task::promise_type> task::awaiter::await_suspend(
-        std::coroutine_handle<> h) noexcept {
-    coro_.promise().continuation_ = h;
-    return coro_;
-}
-
-inline int task::awaiter::await_resume() {
-    if (coro_.promise().result_.index() == 2) {
-        std::rethrow_exception(std::get<2>(std::move(coro_.promise().result_)));
-    }
-    return std::get<1>(coro_.promise().result_);
-}
-
-inline task::awaiter task::operator co_await() && noexcept {
-    return task::awaiter{coro_};
-}
-
-inline task::task(std::coroutine_handle<task::promise_type> h) noexcept
-: coro_(h)
-{}
-
-#endif
 
 // Forward declaration of a function called by the function we are lowering.
 task f(int x);
