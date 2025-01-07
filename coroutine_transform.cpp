@@ -69,8 +69,8 @@ template<typename Promise> struct __coroutine_state_with_promise: __coroutine_st
         Promise __promise;
     };
 
-     __coroutine_state_with_promise() noexcept {}
-    ~__coroutine_state_with_promise()          {}
+    /**/  __coroutine_state_with_promise() noexcept {}
+    /**/ ~__coroutine_state_with_promise()          {}
 };
 
 namespace std
@@ -291,8 +291,8 @@ class task
                 std::variant<std::monostate, int, std::exception_ptr> result_;
 
             public:
-                 promise_type() noexcept {}
-                ~promise_type()          {}
+                /**/  promise_type() noexcept {}
+                /**/ ~promise_type()          {}
 
             public:
                 struct final_awaiter
@@ -387,76 +387,84 @@ task f(int x);
 //////////////////////
 // Helpers used by Coroutine Lowering
 
-template<typename T>
-struct manual_lifetime {
-    manual_lifetime() noexcept = default;
-    ~manual_lifetime() = default;
+template<typename T> struct manual_lifetime
+{
+    private:
+        alignas(T) std::byte storage[sizeof(T)];
 
-    // Not copyable/movable
-    manual_lifetime(const manual_lifetime&) = delete;
-    manual_lifetime(manual_lifetime&&) = delete;
-    manual_lifetime& operator=(const manual_lifetime&) = delete;
-    manual_lifetime& operator=(manual_lifetime&&) = delete;
+    public:
+        /**/  manual_lifetime() noexcept = default;
+        /**/ ~manual_lifetime()          = default;
 
-    template<typename Factory>
-        requires
-        std::invocable<Factory&> &&
-        std::same_as<std::invoke_result_t<Factory&>, T>
-        T& construct_from(Factory factory) noexcept(std::is_nothrow_invocable_v<Factory&>) {
+        manual_lifetime            (const manual_lifetime  &) = delete;
+        manual_lifetime            (      manual_lifetime &&) = delete;
+        manual_lifetime & operator=(const manual_lifetime  &) = delete;
+        manual_lifetime & operator=(      manual_lifetime &&) = delete;
+
+        template<typename Factory>
+            requires std::invocable<Factory&> &&
+                     std::same_as<std::invoke_result_t<Factory&>, T>
+        T & construct_from(Factory factory) noexcept(std::is_nothrow_invocable_v<Factory &>)
+        {
             return *::new (static_cast<void*>(&storage)) T(factory());
         }
 
-    void destroy() noexcept(std::is_nothrow_destructible_v<T>) {
-        std::destroy_at(std::launder(reinterpret_cast<T*>(&storage)));
-    }
+        void destroy() noexcept(std::is_nothrow_destructible_v<T>)
+        {
+            std::destroy_at(std::launder(reinterpret_cast<T*>(&storage)));
+        }
 
-    T& get() & noexcept {
-        return *std::launder(reinterpret_cast<T*>(&storage));
-    }
-
-    private:
-    alignas(T) std::byte storage[sizeof(T)];
+        T & get() & noexcept
+        {
+            return *std::launder(reinterpret_cast<T *>(&storage));
+        }
 };
 
-template<typename T>
-struct destructor_guard {
-    explicit destructor_guard(manual_lifetime<T>& obj) noexcept
-        : ptr_(std::addressof(obj))
+template<typename T> struct destructor_guard
+{
+    private:
+        manual_lifetime<T> * ptr_;
+
+    public:
+        explicit destructor_guard(manual_lifetime<T> & obj) noexcept
+            : ptr_(std::addressof(obj))
         {}
 
-    // non-movable
-    destructor_guard(destructor_guard&&) = delete;
-    destructor_guard& operator=(destructor_guard&&) = delete;
-
-    ~destructor_guard() noexcept(std::is_nothrow_destructible_v<T>) {
-        if (ptr_ != nullptr) {
-            ptr_->destroy();
+        ~destructor_guard() noexcept(std::is_nothrow_destructible_v<T>)
+        {
+            if (ptr_ != nullptr) {
+                ptr_->destroy();
+            }
         }
-    }
 
-    void cancel() noexcept { ptr_ = nullptr; }
+        destructor_guard            (destructor_guard&&) = delete;
+        destructor_guard & operator=(destructor_guard&&) = delete;
 
-    private:
-    manual_lifetime<T>* ptr_;
+    public:
+        void cancel() noexcept
+        {
+            ptr_ = nullptr;
+        }
 };
 
 // Parital specialisation for types that don't need their destructors called.
 template<typename T>
-requires std::is_trivially_destructible_v<T>
-struct destructor_guard<T> {
-    explicit destructor_guard(manual_lifetime<T>&) noexcept {}
+    requires std::is_trivially_destructible_v<T>
+struct destructor_guard<T>
+{
+    explicit destructor_guard(manual_lifetime<T> &) noexcept {}
     void cancel() noexcept {}
 };
 
 // Class-template argument deduction to simplify usage
-template<typename T>
-destructor_guard(manual_lifetime<T>& obj) -> destructor_guard<T>;
+template<typename T> destructor_guard(manual_lifetime<T>& obj) -> destructor_guard<T>;
 
-template<typename Promise, typename... Params>
-Promise construct_promise([[maybe_unused]] Params&... params) {
-    if constexpr (std::constructible_from<Promise, Params&...>) {
+template<typename Promise, typename... Params> Promise construct_promise([[maybe_unused]] Params&... params)
+{
+    if constexpr (std::constructible_from<Promise, Params&...>){
         return Promise(params...);
-    } else {
+    }
+    else{
         return Promise();
     }
 }
@@ -471,13 +479,14 @@ Promise construct_promise([[maybe_unused]] Params&... params) {
 
 using __g_promise_t = std::coroutine_traits<task, int>::promise_type;
 
-__coroutine_state* __g_resume(__coroutine_state* s);
-void __g_destroy(__coroutine_state* s);
+__coroutine_state * __g_resume (__coroutine_state *);
+void                __g_destroy(__coroutine_state *);
 
 /////
 // The coroutine-state definition
 
-struct __g_state : __coroutine_state_with_promise<__g_promise_t> {
+struct __g_state : __coroutine_state_with_promise<__g_promise_t>
+{
     __g_state(int&& x)
         : x(static_cast<int&&>(x)) {
             // Initialise the function-pointers used by coroutine_handle::resume/destroy/done().
@@ -515,7 +524,8 @@ struct __g_state : __coroutine_state_with_promise<__g_promise_t> {
 /////
 // The "ramp" function
 
-task g(int x) {
+task g(int x)
+{
     std::unique_ptr<__g_state> state(new __g_state(static_cast<int&&>(x)));
     decltype(auto) return_value = state->__promise.get_return_object();
 
@@ -537,7 +547,8 @@ task g(int x) {
 /////
 //  The "resume" function
 
-__coroutine_state* __g_resume(__coroutine_state* s) {
+__coroutine_state* __g_resume(__coroutine_state* s)
+{
     auto* state = static_cast<__g_state*>(s);
 
     std::coroutine_handle<void> coro_to_resume;
@@ -634,7 +645,8 @@ final_suspend:
 /////
 // The "destroy" function
 
-void __g_destroy(__coroutine_state* s) {
+void __g_destroy(__coroutine_state* s)
+{
     auto* state = static_cast<__g_state*>(s);
 
     switch (state->__suspend_point) {
