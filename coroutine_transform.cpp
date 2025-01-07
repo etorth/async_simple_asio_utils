@@ -614,7 +614,7 @@ suspend_point_1:
         state->__promise.return_value(fx * fx);
         goto final_suspend;
     }
-    catch (...){
+    catch(...){
         state->__promise.unhandled_exception();
         goto final_suspend;
     }
@@ -622,22 +622,21 @@ suspend_point_1:
 final_suspend:
     // co_await promise.final_suspend
     {
-        state->__tmp4.construct_from([&]() noexcept {
-                return state->__promise.final_suspend();
-                });
+        state->__tmp4.construct_from([&]() noexcept
+        {
+            return state->__promise.final_suspend();
+        });
         destructor_guard tmp4_dtor{state->__tmp4};
 
-        if (!state->__tmp4.get().await_ready()) {
+        if(!state->__tmp4.get().await_ready()){
             state->__suspend_point = 2;
             state->__resume = nullptr; // mark as final suspend-point
 
-            auto h = state->__tmp4.get().await_suspend(
-                    std::coroutine_handle<__g_promise_t>::from_promise(state->__promise));
+            auto h = state->__tmp4.get().await_suspend(std::coroutine_handle<__g_promise_t>::from_promise(state->__promise));
 
             tmp4_dtor.cancel();
-            return static_cast<__coroutine_state*>(h.address());
+            return static_cast<__coroutine_state *>(h.address());
         }
-
         state->__tmp4.get().await_resume();
     }
 
@@ -654,7 +653,7 @@ void __g_destroy(__coroutine_state* s)
 {
     auto* state = static_cast<__g_state*>(s);
 
-    switch (state->__suspend_point) {
+    switch(state->__suspend_point){
         case 0: goto suspend_point_0;
         case 1: goto suspend_point_1;
         case 2: goto suspend_point_2;
