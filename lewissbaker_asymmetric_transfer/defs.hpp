@@ -467,4 +467,4 @@ template<typename Promise, typename... Params> Promise construct_promise([[maybe
 
 // Forward declaration of a function called by the function we are lowering.
 task f(int x);
-taks g(int x);
+task g(int x);
