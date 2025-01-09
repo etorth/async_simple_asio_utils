@@ -1,2 +1,2 @@
 all:
-	g++-14 -std=c++23 f.cpp g.cpp
+	g++-14 -std=c++23 f.cpp g.cpp main.cpp -g -O0
