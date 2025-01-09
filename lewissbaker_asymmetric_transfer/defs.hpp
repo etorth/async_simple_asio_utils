@@ -8,7 +8,10 @@
 // This code sample shows the lowering of the following simple coroutine into equivalent
 // non-coroutine C++ code.
 //
-//   task f(int x);
+//   task f(int x) {
+//     co_return x;
+//   }
+//
 //   task g(int x) {
 //     int fx = co_await f(x);
 //     co_return fx * fx;
