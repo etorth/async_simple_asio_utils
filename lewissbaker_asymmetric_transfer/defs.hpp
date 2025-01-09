@@ -384,6 +384,9 @@ class task
     public:
         int execute()
         {
+            // add this member function to access result from a non-coroutine
+            // need to setup continuation_ to describe what to do after task finished, it's noop_coroutine since execute() is not a coroutine
+
             awaiter{coro_}.await_suspend(std::noop_coroutine());
             coro_.resume();
             return awaiter{coro_}.await_resume();
