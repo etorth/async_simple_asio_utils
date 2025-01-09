@@ -380,6 +380,15 @@ class task
         explicit task(std::coroutine_handle<promise_type> h) noexcept
             : coro_(h)
         {}
+
+    public:
+        int execute()
+        {
+            while(!coro_.done()){
+                coro_.resume();
+            }
+            return awaiter{coro_}.await_resume();
+        }
 };
 
 //////////////////////
