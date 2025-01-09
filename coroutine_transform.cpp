@@ -38,7 +38,7 @@
 
 struct __coroutine_state
 {
-    using  __resume_fn = __coroutine_state* (__coroutine_state *);
+    using  __resume_fn = __coroutine_state *(__coroutine_state *);
     using __destroy_fn =              void  (__coroutine_state *);
 
      __resume_fn *__resume;
@@ -46,12 +46,12 @@ struct __coroutine_state
 
     static const __coroutine_state __noop_coroutine;
 
-    static __coroutine_state * __noop_resume(__coroutine_state* __state) noexcept
+    static __coroutine_state * __noop_resume(__coroutine_state *__state) noexcept
     {
         return __state;
     }
 
-    static void __noop_destroy(__coroutine_state*) noexcept
+    static void __noop_destroy(__coroutine_state *) noexcept
     {
     }
 };
@@ -94,10 +94,10 @@ namespace std
         public:
             void * address() const
             {
-                return static_cast<void*>(state_);
+                return static_cast<void *>(state_);
             }
 
-            static coroutine_handle from_address(void* ptr)
+            static coroutine_handle from_address(void *ptr)
             {
                 coroutine_handle h;
                 h.state_ = static_cast<__coroutine_state *>(ptr);
@@ -116,7 +116,7 @@ namespace std
 
             void resume() const
             {
-                __coroutine_state* s = state_;
+                __coroutine_state *s = state_;
                 do{
                     s = s->__resume(s);
                 }
@@ -165,13 +165,13 @@ namespace std
 
             void * address() const
             {
-                return static_cast<void*>(static_cast<__coroutine_state *>(state_));
+                return static_cast<void *>(static_cast<__coroutine_state *>(state_));
             }
 
             static coroutine_handle from_address(void * ptr)
             {
                 coroutine_handle h;
-                h.state_ = static_cast<state_t*>(static_cast<__coroutine_state *>(ptr));
+                h.state_ = static_cast<state_t *>(static_cast<__coroutine_state *>(ptr));
                 return h;
             }
 
@@ -216,8 +216,8 @@ namespace std
     template<> class coroutine_handle<noop_coroutine_promise>
     {
         public:
-            constexpr coroutine_handle            (const coroutine_handle&) noexcept = default;
-            constexpr coroutine_handle & operator=(const coroutine_handle&) noexcept = default;
+            constexpr coroutine_handle            (const coroutine_handle &) noexcept = default;
+            constexpr coroutine_handle & operator=(const coroutine_handle &) noexcept = default;
 
         public:
             constexpr explicit operator bool() noexcept
@@ -402,16 +402,16 @@ template<typename T> struct manual_lifetime
         manual_lifetime & operator=(      manual_lifetime &&) = delete;
 
         template<typename Factory>
-            requires std::invocable<Factory&> &&
-                     std::same_as<std::invoke_result_t<Factory&>, T>
+            requires std::invocable<Factory &> &&
+                     std::same_as<std::invoke_result_t<Factory &>, T>
         T & construct_from(Factory factory) noexcept(std::is_nothrow_invocable_v<Factory &>)
         {
-            return *::new (static_cast<void*>(&storage)) T(factory());
+            return *::new (static_cast<void *>(&storage)) T(factory());
         }
 
         void destroy() noexcept(std::is_nothrow_destructible_v<T>)
         {
-            std::destroy_at(std::launder(reinterpret_cast<T*>(&storage)));
+            std::destroy_at(std::launder(reinterpret_cast<T *>(&storage)));
         }
 
         T & get() & noexcept
@@ -437,8 +437,8 @@ template<typename T> struct destructor_guard
             }
         }
 
-        destructor_guard            (destructor_guard&&) = delete;
-        destructor_guard & operator=(destructor_guard&&) = delete;
+        destructor_guard            (destructor_guard &&) = delete;
+        destructor_guard & operator=(destructor_guard &&) = delete;
 
     public:
         void cancel() noexcept
@@ -459,9 +459,9 @@ struct destructor_guard<T>
 // Class-template argument deduction to simplify usage
 template<typename T> destructor_guard(manual_lifetime<T>& obj) -> destructor_guard<T>;
 
-template<typename Promise, typename... Params> Promise construct_promise([[maybe_unused]] Params&... params)
+template<typename Promise, typename... Params> Promise construct_promise([[maybe_unused]] Params &... params)
 {
-    if constexpr (std::constructible_from<Promise, Params&...>){
+    if constexpr (std::constructible_from<Promise, Params &...>){
         return Promise(params...);
     }
     else{
@@ -506,7 +506,7 @@ struct __g_state : __coroutine_state_with_promise<__g_promise_t>
         manual_lifetime<task::promise_type::final_awaiter> __tmp4;
     };
 
-    __g_state(int&& x)
+    __g_state(int && x)
         : x(static_cast<int &&>(x))
     {
             // Initialise the function-pointers used by coroutine_handle::resume/destroy/done().
@@ -515,7 +515,7 @@ struct __g_state : __coroutine_state_with_promise<__g_promise_t>
 
             // Use placement-new to initialise the promise object in the base-class
             // after we've initialised the argument copies.
-            ::new ((void*)std::addressof(this->__promise)) __g_promise_t(construct_promise<__g_promise_t>(this->x));
+            ::new ((void *)std::addressof(this->__promise)) __g_promise_t(construct_promise<__g_promise_t>(this->x));
     }
 
     ~__g_state()
@@ -529,7 +529,7 @@ struct __g_state : __coroutine_state_with_promise<__g_promise_t>
 
 task g(int x)
 {
-    std::unique_ptr<__g_state> state(new __g_state(static_cast<int&&>(x)));
+    std::unique_ptr<__g_state> state(new __g_state(static_cast<int &&>(x)));
     decltype(auto) return_obj = state->__promise.get_return_object();
 
     state->__tmp1.construct_from([&]() -> decltype(auto)
@@ -554,7 +554,7 @@ task g(int x)
 
 __coroutine_state *__g_resume(__coroutine_state *s)
 {
-    auto* state = static_cast<__g_state *>(s);
+    auto *state = static_cast<__g_state *>(s);
     std::coroutine_handle<void> coro_to_resume;
 
     try{
@@ -643,15 +643,15 @@ final_suspend:
     //  Destroy coroutine-state if execution flows off end of coroutine
     delete state;
 
-    return static_cast<__coroutine_state*>(std::noop_coroutine().address());
+    return static_cast<__coroutine_state *>(std::noop_coroutine().address());
 }
 
 /////
 // The "destroy" function
 
-void __g_destroy(__coroutine_state* s)
+void __g_destroy(__coroutine_state *s)
 {
-    auto* state = static_cast<__g_state*>(s);
+    auto *state = static_cast<__g_state *>(s);
 
     switch(state->__suspend_point){
         case 0: goto suspend_point_0;
