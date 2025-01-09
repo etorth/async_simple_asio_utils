@@ -28,10 +28,6 @@
 #include<memory>
 #include<utility>
 
-// Forward declaration of a function called by the function we are lowering.
-task f(int x);
-taks g(int x);
-
 //////////////////////////////////////////////////
 // <coroutine> header definitions
 //
@@ -467,3 +463,8 @@ template<typename Promise, typename... Params> Promise construct_promise([[maybe
         return Promise();
     }
 }
+
+
+// Forward declaration of a function called by the function we are lowering.
+task f(int x);
+taks g(int x);
