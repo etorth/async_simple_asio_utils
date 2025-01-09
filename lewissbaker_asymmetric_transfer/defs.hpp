@@ -384,9 +384,8 @@ class task
     public:
         int execute()
         {
-            while(!coro_.done()){
-                coro_.resume();
-            }
+            awaiter{coro_}.await_suspend(std::noop_coroutine());
+            coro_.resume();
             return awaiter{coro_}.await_resume();
         }
 };
