@@ -8,13 +8,16 @@
 
 namespace corof
 {
-    struct base_promise
+    namespace _details
     {
-        std::coroutine_handle<> handle = nullptr;
+        struct base_promise
+        {
+            std::coroutine_handle<> handle = nullptr;
 
-        base_promise *m_inner_promise = nullptr;
-        base_promise *m_outer_promise = nullptr;
-    };
+            base_promise *inner_promise = nullptr;
+            base_promise *outer_promise = nullptr;
+        };
+    }
 
     template<typename T> class [[nodiscard]] eval_poller
     {
@@ -25,24 +28,19 @@ namespace corof
             using promise_type = eval_poller_promise;
 
         private:
-            class eval_poller_promise final: public base_promise
+            class eval_poller_promise final: public _details::base_promise
             {
-                // hiden its definition and expose by aliasing to promise_type
-                // this type is for compiler, user should never instantiate an eval_poller_promise object
-
                 private:
                     friend class eval_poller;
 
                 private:
                     T m_value;
-
-                private:
                     std::exception_ptr m_exception = nullptr;
 
                 public:
-                    auto initial_suspend()
+                    auto initial_suspend() noexcept
                     {
-                        return awaiter(std::coroutine_handle<eval_poller_promise>::from_promise(*this));
+                        return std::suspend_always{};
                     }
 
                     auto final_suspend() noexcept
@@ -57,7 +55,7 @@ namespace corof
 
                     eval_poller get_return_object()
                     {
-                        return {std::coroutine_handle<eval_poller_promise>::from_promise(*this)};
+                        return eval_poller{std::coroutine_handle<eval_poller_promise>::from_promise(*this)};
                     }
 
                     void unhandled_exception()
@@ -79,20 +77,20 @@ namespace corof
                     friend class eval_poller;
 
                 private:
-                    std::coroutine_handle<eval_poller_promise> m_awaiter_handle;
+                    std::coroutine_handle<eval_poller_promise> m_handle;
 
                 private:
                     explicit awaiter(std::coroutine_handle<eval_poller_promise> handle)
-                        : m_awaiter_handle(handle)
+                        : m_handle(handle)
                     {
-                        m_awaiter_handle.promise().handle = m_awaiter_handle;
+                        m_handle.promise().handle = m_handle;
                     }
 
                 public:
                     awaiter(awaiter && other)
                     {
-                        std::swap(m_awaiter_handle, other.m_awaiter_handle);
-                        assert(m_awaiter_handle);
+                        std::swap(m_handle, other.m_handle);
+                        assert(m_handle);
                     }
 
                 public:
@@ -102,8 +100,8 @@ namespace corof
                 public:
                     ~awaiter()
                     {
-                        // if(m_awaiter_handle){
-                        //     m_awaiter_handle.destroy();
+                        // if(m_handle){
+                        //     m_handle.destroy();
                         // }
                     }
 
@@ -116,14 +114,14 @@ namespace corof
                 public:
                     template<typename OUT_PROMISE> void await_suspend(std::coroutine_handle<OUT_PROMISE> handle) noexcept
                     {
-                        /**/      handle.promise().m_inner_promise = std::addressof(m_awaiter_handle.promise());
-                        m_awaiter_handle.promise().m_outer_promise = std::addressof(          handle.promise());
+                        /**/      handle.promise().inner_promise = std::addressof(m_handle.promise());
+                        m_handle.promise().outer_promise = std::addressof(          handle.promise());
                     }
 
                 public:
                     T await_resume()
                     {
-                        return m_awaiter_handle.promise().m_value;
+                        return m_handle.promise().m_value;
                     }
             };
 
@@ -131,7 +129,7 @@ namespace corof
             std::coroutine_handle<eval_poller_promise> m_handle;
 
         public:
-            eval_poller(std::coroutine_handle<eval_poller_promise> handle = nullptr)
+            explicit eval_poller(std::coroutine_handle<eval_poller_promise> handle = nullptr)
                 : m_handle(handle)
             {}
 
@@ -173,17 +171,17 @@ namespace corof
                 auto curr_promise = find_promise(std::addressof(m_handle.promise()));
 
                 if(curr_promise->handle.done()){
-                    if(!curr_promise->m_outer_promise){
+                    if(!curr_promise->outer_promise){
                         return true;
                     }
 
                     // jump out for one layer
                     // should I call destroy() for done handle?
 
-                    auto outer_promise = curr_promise->m_outer_promise;
+                    auto outer_promise = curr_promise->outer_promise;
 
                     curr_promise = outer_promise;
-                    curr_promise->m_inner_promise = nullptr;
+                    curr_promise->inner_promise = nullptr;
                 }
 
                 // resume only once and return immediately
@@ -194,14 +192,14 @@ namespace corof
             }
 
         private:
-            static inline base_promise *find_promise(base_promise *promise)
+            static inline _details::base_promise *find_promise(_details::base_promise *promise)
             {
                 auto curr_promise = promise;
-                auto next_promise = promise->m_inner_promise;
+                auto next_promise = promise->inner_promise;
 
                 while(curr_promise && next_promise){
                     curr_promise = next_promise;
-                    next_promise = next_promise->m_inner_promise;
+                    next_promise = next_promise->inner_promise;
                 }
                 return curr_promise;
             }
