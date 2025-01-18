@@ -251,32 +251,20 @@ namespace corof
             }
     };
 
-    inline auto async_wait(uint64_t msec) noexcept
+    inline corof::eval_poller<size_t> async_wait(uint64_t msec)
     {
-        return [](uint64_t msec) -> corof::eval_poller<uint64_t>
-        {
-            size_t count = 0;
-            if(msec == 0){
+        size_t count = 0;
+        if(msec == 0){
+            co_await std::suspend_always{};
+            count++;
+        }
+        else{
+            hres_timer timer;
+            while(timer.diff_msec() < msec){
                 co_await std::suspend_always{};
                 count++;
             }
-            else{
-                hres_timer timer;
-                while(timer.diff_msec() < msec){
-                    co_await std::suspend_always{};
-                    count++;
-                }
-            }
-            co_return count;
-        }(msec);
-    }
-
-    template<typename T> inline auto delay_value(uint64_t msec, T t) // how about variadic template argument
-    {
-        return [](uint64_t msec, T t) -> corof::eval_poller<T>
-        {
-            co_await corof::async_wait(msec);
-            co_return t;
-        }(msec, std::move(t));
+        }
+        co_return count;
     }
 }

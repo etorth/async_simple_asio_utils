@@ -5,12 +5,14 @@
 
 corof::eval_poller<> k()
 {
-    co_return;
+    std::cout << "begin wait" << std::endl;
+    hres_timer t;
+    co_await corof::async_wait(1000);
+    std::cout << "end   wait: " << t.diff_secf() << std::endl;
 }
 
 corof::eval_poller<int> f()
 {
-    co_await k();
     co_await k();
     co_return 12;
 }
