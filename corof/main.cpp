@@ -3,8 +3,14 @@
 #include <cstdint>
 #include "corof.hpp"
 
+corof::eval_poller<> k()
+{
+    co_return;
+}
+
 corof::eval_poller<int> f()
 {
+    co_await k();
     co_return 12;
 }
 

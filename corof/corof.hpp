@@ -18,76 +18,75 @@ namespace corof
             virtual ~base_promise() = default;
             virtual std::coroutine_handle<> get_handle() = 0;
         };
+
+        struct eval_poller_base_promise: public base_promise
+        {
+            std::exception_ptr exceptr = nullptr;
+            auto initial_suspend() noexcept
+            {
+                return std::suspend_always{};
+            }
+
+            auto final_suspend() noexcept
+            {
+                return std::suspend_always{};
+            }
+
+            void unhandled_exception()
+            {
+                exceptr = std::current_exception();
+            }
+
+            void rethrow_if_unhandled_exception()
+            {
+                if(exceptr){
+                    std::rethrow_exception(exceptr);
+                }
+            }
+        };
+
+        struct eval_poller_promise_with_void: public _details::eval_poller_base_promise
+        {
+            void return_void(){}
+        };
+
+        template<typename T> struct eval_poller_promise_with_type: public _details::eval_poller_base_promise
+        {
+            T value;
+            void return_value(T t)
+            {
+                value = std::move(t);
+            }
+        };
     }
 
-    template<typename T> class [[nodiscard]] eval_poller
+    template<typename T = void> class [[nodiscard]] eval_poller
     {
-        private:
-            class eval_poller_promise;
-
         public:
-            using promise_type = eval_poller_promise;
-
-        private:
-            class eval_poller_promise final: public _details::base_promise
+            struct promise_type: public std::conditional_t<std::is_void_v<T>, _details::eval_poller_promise_with_void, _details::eval_poller_promise_with_type<T>>
             {
-                private:
-                    friend class eval_poller;
+                std::coroutine_handle<> get_handle() override
+                {
+                    return std::coroutine_handle<promise_type>::from_promise(*this);
+                }
 
-                private:
-                    T m_value;
-                    std::exception_ptr m_exception = nullptr;
-
-                public:
-                    std::coroutine_handle<> get_handle() override
-                    {
-                        return std::coroutine_handle<eval_poller_promise>::from_promise(*this);
-                    }
-
-                public:
-                    auto initial_suspend() noexcept
-                    {
-                        return std::suspend_always{};
-                    }
-
-                    auto final_suspend() noexcept
-                    {
-                        return std::suspend_always{};
-                    }
-
-                    void return_value(T t)
-                    {
-                        m_value = std::move(t);
-                    }
-
-                    eval_poller get_return_object()
-                    {
-                        return eval_poller{std::coroutine_handle<eval_poller_promise>::from_promise(*this)};
-                    }
-
-                    void unhandled_exception()
-                    {
-                        m_exception = std::current_exception();
-                    }
-
-                    void rethrow_if_unhandled_exception()
-                    {
-                        if(m_exception){
-                            std::rethrow_exception(m_exception);
-                        }
-                    }
+                eval_poller get_return_object()
+                {
+                    return eval_poller{std::coroutine_handle<promise_type>::from_promise(*this)};
+                }
             };
 
+        private:
             class [[nodiscard]] awaiter
             {
                 private:
                     friend class eval_poller;
 
                 private:
-                    std::coroutine_handle<eval_poller_promise> m_handle;
+                    std::coroutine_handle<eval_poller::promise_type> m_handle;
 
                 private:
-                    explicit awaiter(std::coroutine_handle<eval_poller_promise> handle)
+                    explicit awaiter(std::coroutine_handle<eval_poller::promise_type> handle)
                         : m_handle(handle)
                     {}
 
@@ -111,17 +110,22 @@ namespace corof
                     }
 
                 public:
-                    T await_resume()
+                    auto await_resume()
                     {
-                        return m_handle.promise().m_value;
+                        if constexpr(std::is_void_v<T>){
+                            return;
+                        }
+                        else{
+                            return m_handle.promise().value;
+                        }
                     }
             };
 
         private:
-            std::coroutine_handle<eval_poller_promise> m_handle;
+            std::coroutine_handle<eval_poller::promise_type> m_handle;
 
         public:
-            explicit eval_poller(std::coroutine_handle<eval_poller_promise> handle)
+            explicit eval_poller(std::coroutine_handle<eval_poller::promise_type> handle)
                 : m_handle(handle)
             {}
 
