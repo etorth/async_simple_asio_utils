@@ -12,10 +12,11 @@ namespace corof
     {
         struct base_promise
         {
-            std::coroutine_handle<> handle = nullptr;
-
             base_promise *inner_promise = nullptr;
             base_promise *outer_promise = nullptr;
+
+            virtual ~base_promise() = default;
+            virtual std::coroutine_handle<> get_handle() = 0;
         };
     }
 
@@ -36,6 +37,12 @@ namespace corof
                 private:
                     T m_value;
                     std::exception_ptr m_exception = nullptr;
+
+                public:
+                    std::coroutine_handle<> get_handle() override
+                    {
+                        return std::coroutine_handle<eval_poller_promise>::from_promise(*this);
+                    }
 
                 public:
                     auto initial_suspend() noexcept
@@ -82,28 +89,17 @@ namespace corof
                 private:
                     explicit awaiter(std::coroutine_handle<eval_poller_promise> handle)
                         : m_handle(handle)
-                    {
-                        m_handle.promise().handle = m_handle;
-                    }
+                    {}
 
                 public:
                     awaiter(awaiter && other)
                     {
                         std::swap(m_handle, other.m_handle);
-                        assert(m_handle);
                     }
 
                 public:
                     awaiter              (const awaiter &) = delete;
                     awaiter & operator = (const awaiter &) = delete;
-
-                public:
-                    ~awaiter()
-                    {
-                        // if(m_handle){
-                        //     m_handle.destroy();
-                        // }
-                    }
 
                 public:
                     bool await_ready() noexcept
@@ -112,10 +108,10 @@ namespace corof
                     }
 
                 public:
-                    template<typename OUT_PROMISE> void await_suspend(std::coroutine_handle<OUT_PROMISE> handle) noexcept
+                    template<typename OuterPrimise> void await_suspend(std::coroutine_handle<OuterPrimise> h) noexcept
                     {
-                        /**/      handle.promise().inner_promise = std::addressof(m_handle.promise());
-                        m_handle.promise().outer_promise = std::addressof(          handle.promise());
+                        /**/   h.promise().inner_promise = std::addressof(m_handle.promise());
+                        m_handle.promise().outer_promise = std::addressof(       h.promise());
                     }
 
                 public:
@@ -129,7 +125,7 @@ namespace corof
             std::coroutine_handle<eval_poller_promise> m_handle;
 
         public:
-            explicit eval_poller(std::coroutine_handle<eval_poller_promise> handle = nullptr)
+            explicit eval_poller(std::coroutine_handle<eval_poller_promise> handle)
                 : m_handle(handle)
             {}
 
@@ -170,7 +166,7 @@ namespace corof
                 assert(m_handle);
                 auto curr_promise = find_promise(std::addressof(m_handle.promise()));
 
-                if(curr_promise->handle.done()){
+                if(curr_promise->get_handle().done()){
                     if(!curr_promise->outer_promise){
                         return true;
                     }
@@ -187,7 +183,7 @@ namespace corof
                 // resume only once and return immediately
                 // after resume curr_handle can be in done state, next call to poll should unlink it
 
-                curr_promise->handle.resume();
+                curr_promise->get_handle().resume();
                 return m_handle.done();
             }
 

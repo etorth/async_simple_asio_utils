@@ -8,15 +8,15 @@ corof::eval_poller<int> f()
     co_return 12;
 }
 
-// corof::eval_poller<std::string> g()
-// {
-//     co_return std::string("7");
-// }
-
-corof::eval_poller<const char *> g()
+corof::eval_poller<std::string> g()
 {
-    co_return "7";
+    co_return std::string("7");
 }
+
+// corof::eval_poller<const char *> g()
+// {
+//     co_return "7";
+// }
 
 corof::eval_poller<int> r()
 {
