@@ -1,5 +1,4 @@
 #pragma once
-#include <any>
 #include <optional>
 #include <coroutine>
 #include <exception>
@@ -92,14 +91,10 @@ namespace corof
                     {}
 
                 public:
-                    awaiter(awaiter && other)
-                    {
-                        std::swap(m_handle, other.m_handle);
-                    }
-
-                public:
-                    awaiter              (const awaiter &) = delete;
-                    awaiter & operator = (const awaiter &) = delete;
+                    awaiter              (      awaiter &&) = delete;
+                    awaiter              (const awaiter  &) = delete;
+                    awaiter & operator = (      awaiter &&) = delete;
+                    awaiter & operator = (const awaiter  &) = delete;
 
                 public:
                     bool await_ready() noexcept
