@@ -11,6 +11,7 @@ corof::eval_poller<> k()
 corof::eval_poller<int> f()
 {
     co_await k();
+    co_await k();
     co_return 12;
 }
 
