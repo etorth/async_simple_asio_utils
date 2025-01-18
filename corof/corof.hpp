@@ -42,7 +42,7 @@ namespace corof
                 public:
                     auto initial_suspend()
                     {
-                        return std::suspend_always{};
+                        return awaiter(std::coroutine_handle<eval_poller_promise>::from_promise(*this));
                     }
 
                     auto final_suspend() noexcept
@@ -102,9 +102,9 @@ namespace corof
                 public:
                     ~awaiter()
                     {
-                        if(m_awaiter_handle){
-                            m_awaiter_handle.destroy();
-                        }
+                        // if(m_awaiter_handle){
+                        //     m_awaiter_handle.destroy();
+                        // }
                     }
 
                 public:
@@ -222,70 +222,3 @@ namespace corof
             }
     };
 }
-
-// namespace corof
-// {
-//     template<typename T> class async_variable
-//     {
-//         private:
-//             std::optional<T> m_var;
-//
-//         public:
-//             template<typename U = T> void assign(U && u)
-//             {
-//                 assert(!m_var.has_value());
-//                 m_var = std::make_optional<T>(std::move(u));
-//             }
-//
-//         public:
-//             async_variable() = default;
-//
-//         public:
-//             template<typename U    > async_variable                 (const async_variable<U> &) = delete;
-//             template<typename U = T> async_variable<T> & operator = (const async_variable<U> &) = delete;
-//
-//         public:
-//             auto operator co_await() noexcept
-//             {
-//                 const auto fnwait = +[](corof::async_variable<T> *p) -> corof::eval_poller
-//                 {
-//                     while(!p->m_var.has_value()){
-//                         co_await std::suspend_always{};
-//                     }
-//                     co_return p->m_var.value();
-//                 };
-//                 return fnwait(this). template to_awaiter<T>();
-//             }
-//     };
-//
-//     inline auto async_wait(uint64_t msec) noexcept
-//     {
-//         const auto fnwait = +[](uint64_t msec) -> corof::eval_poller
-//         {
-//             size_t count = 0;
-//             if(msec == 0){
-//                 co_await std::suspend_always{};
-//                 count++;
-//             }
-//             else{
-//                 hres_timer timer;
-//                 while(timer.diff_msec() < msec){
-//                     co_await std::suspend_always{};
-//                     count++;
-//                 }
-//             }
-//             co_return count;
-//         };
-//         return fnwait(msec).to_awaiter<size_t>();
-//     }
-//
-//     template<typename T> inline auto delay_value(uint64_t msec, T t) // how about variadic template argument
-//     {
-//         const auto fnwait = +[](uint64_t msec, T t) -> corof::eval_poller
-//         {
-//             co_await corof::async_wait(msec);
-//             co_return t;
-//         };
-//         return fnwait(msec, std::move(t)). template to_awaiter<T>();
-//     }
-// }
