@@ -1,111 +1,100 @@
 #pragma once
-#include <any>
 #include <optional>
 #include <coroutine>
 #include <exception>
 #include <cassert>
 #include "raiitimer.hpp"
+#define fflassert(...) assert(__VA_ARGS__)
 
 namespace corof
 {
-    struct base_promise
+    namespace _details
     {
-        std::coroutine_handle<> handle = nullptr;
+        struct base_promise
+        {
+            base_promise *inner_promise = nullptr;
+            base_promise *outer_promise = nullptr;
 
-        base_promise *m_inner_promise = nullptr;
-        base_promise *m_outer_promise = nullptr;
-    };
+            virtual ~base_promise() = default;
+            virtual std::coroutine_handle<> get_handle() = 0;
+        };
 
-    template<typename T> class [[nodiscard]] eval_poller
-    {
-        private:
-            class eval_poller_promise;
-
-        public:
-            using promise_type = eval_poller_promise;
-
-        private:
-            class eval_poller_promise final: public base_promise
+        struct eval_poller_base_promise: public base_promise
+        {
+            std::exception_ptr exceptr = nullptr;
+            auto initial_suspend() noexcept
             {
-                // hiden its definition and expose by aliasing to promise_type
-                // this type is for compiler, user should never instantiate an eval_poller_promise object
+                return std::suspend_always{};
+            }
 
-                private:
-                    friend class eval_poller;
+            auto final_suspend() noexcept
+            {
+                return std::suspend_always{};
+            }
 
-                private:
-                    T m_value;
+            void unhandled_exception()
+            {
+                exceptr = std::current_exception();
+            }
 
-                private:
-                    std::exception_ptr m_exception = nullptr;
+            void rethrow_if_unhandled_exception()
+            {
+                if(exceptr){
+                    std::rethrow_exception(exceptr);
+                }
+            }
+        };
 
-                public:
-                    auto initial_suspend()
-                    {
-                        return std::suspend_always{};
-                    }
+        struct eval_poller_promise_with_void: public _details::eval_poller_base_promise
+        {
+            void return_void(){}
+        };
 
-                    auto final_suspend() noexcept
-                    {
-                        return std::suspend_always{};
-                    }
+        template<typename T> struct eval_poller_promise_with_type: public _details::eval_poller_base_promise
+        {
+            T value;
+            void return_value(T t)
+            {
+                value = std::move(t);
+            }
+        };
+    }
 
-                    void return_value(T t)
-                    {
-                        m_value = std::move(t);
-                    }
+    template<typename T = void> class [[nodiscard]] eval_poller
+    {
+        public:
+            struct promise_type: public std::conditional_t<std::is_void_v<T>, _details::eval_poller_promise_with_void, _details::eval_poller_promise_with_type<T>>
+            {
+                std::coroutine_handle<> get_handle() override
+                {
+                    return std::coroutine_handle<promise_type>::from_promise(*this);
+                }
 
-                    eval_poller get_return_object()
-                    {
-                        return {std::coroutine_handle<eval_poller_promise>::from_promise(*this)};
-                    }
-
-                    void unhandled_exception()
-                    {
-                        m_exception = std::current_exception();
-                    }
-
-                    void rethrow_if_unhandled_exception()
-                    {
-                        if(m_exception){
-                            std::rethrow_exception(m_exception);
-                        }
-                    }
+                eval_poller get_return_object()
+                {
+                    return eval_poller{std::coroutine_handle<promise_type>::from_promise(*this)};
+                }
             };
 
+        private:
             class [[nodiscard]] awaiter
             {
                 private:
                     friend class eval_poller;
 
                 private:
-                    std::coroutine_handle<eval_poller_promise> m_awaiter_handle;
+                    std::coroutine_handle<eval_poller::promise_type> m_handle;
 
                 private:
-                    explicit awaiter(std::coroutine_handle<eval_poller_promise> handle)
-                        : m_awaiter_handle(handle)
-                    {
-                        m_awaiter_handle.promise().handle = m_awaiter_handle;
-                    }
+                    explicit awaiter(std::coroutine_handle<eval_poller::promise_type> handle)
+                        : m_handle(handle)
+                    {}
 
                 public:
-                    awaiter(awaiter && other)
-                    {
-                        std::swap(m_awaiter_handle, other.m_awaiter_handle);
-                        assert(m_awaiter_handle);
-                    }
-
-                public:
-                    awaiter              (const awaiter &) = delete;
-                    awaiter & operator = (const awaiter &) = delete;
-
-                public:
-                    ~awaiter()
-                    {
-                        if(m_awaiter_handle){
-                            m_awaiter_handle.destroy();
-                        }
-                    }
+                    awaiter              (      awaiter &&) = delete;
+                    awaiter              (const awaiter  &) = delete;
+                    awaiter & operator = (      awaiter &&) = delete;
+                    awaiter & operator = (const awaiter  &) = delete;
 
                 public:
                     bool await_ready() noexcept
@@ -114,24 +103,29 @@ namespace corof
                     }
 
                 public:
-                    template<typename OUT_PROMISE> void await_suspend(std::coroutine_handle<OUT_PROMISE> handle) noexcept
+                    template<typename OuterPrimise> void await_suspend(std::coroutine_handle<OuterPrimise> h) noexcept
                     {
-                        /**/      handle.promise().m_inner_promise = std::addressof(m_awaiter_handle.promise());
-                        m_awaiter_handle.promise().m_outer_promise = std::addressof(          handle.promise());
+                        /**/   h.promise().inner_promise = std::addressof(m_handle.promise());
+                        m_handle.promise().outer_promise = std::addressof(       h.promise());
                     }
 
                 public:
-                    T await_resume()
+                    auto await_resume()
                     {
-                        return m_awaiter_handle.promise().m_value;
+                        if constexpr(std::is_void_v<T>){
+                            return;
+                        }
+                        else{
+                            return m_handle.promise().value;
+                        }
                     }
             };
 
         private:
-            std::coroutine_handle<eval_poller_promise> m_handle;
+            std::coroutine_handle<eval_poller::promise_type> m_handle;
 
         public:
-            eval_poller(std::coroutine_handle<eval_poller_promise> handle = nullptr)
+            explicit eval_poller(std::coroutine_handle<eval_poller::promise_type> handle)
                 : m_handle(handle)
             {}
 
@@ -169,39 +163,39 @@ namespace corof
         public:
             bool poll()
             {
-                assert(m_handle);
+                fflassert(m_handle);
                 auto curr_promise = find_promise(std::addressof(m_handle.promise()));
 
-                if(curr_promise->handle.done()){
-                    if(!curr_promise->m_outer_promise){
+                if(curr_promise->get_handle().done()){
+                    if(!curr_promise->outer_promise){
                         return true;
                     }
 
                     // jump out for one layer
                     // should I call destroy() for done handle?
 
-                    auto outer_promise = curr_promise->m_outer_promise;
+                    auto outer_promise = curr_promise->outer_promise;
 
                     curr_promise = outer_promise;
-                    curr_promise->m_inner_promise = nullptr;
+                    curr_promise->inner_promise = nullptr;
                 }
 
                 // resume only once and return immediately
                 // after resume curr_handle can be in done state, next call to poll should unlink it
 
-                curr_promise->handle.resume();
+                curr_promise->get_handle().resume();
                 return m_handle.done();
             }
 
         private:
-            static inline base_promise *find_promise(base_promise *promise)
+            static inline _details::base_promise *find_promise(_details::base_promise *promise)
             {
                 auto curr_promise = promise;
-                auto next_promise = promise->m_inner_promise;
+                auto next_promise = promise->inner_promise;
 
                 while(curr_promise && next_promise){
                     curr_promise = next_promise;
-                    next_promise = next_promise->m_inner_promise;
+                    next_promise = next_promise->inner_promise;
                 }
                 return curr_promise;
             }
@@ -223,69 +217,54 @@ namespace corof
     };
 }
 
-// namespace corof
-// {
-//     template<typename T> class async_variable
-//     {
-//         private:
-//             std::optional<T> m_var;
-//
-//         public:
-//             template<typename U = T> void assign(U && u)
-//             {
-//                 assert(!m_var.has_value());
-//                 m_var = std::make_optional<T>(std::move(u));
-//             }
-//
-//         public:
-//             async_variable() = default;
-//
-//         public:
-//             template<typename U    > async_variable                 (const async_variable<U> &) = delete;
-//             template<typename U = T> async_variable<T> & operator = (const async_variable<U> &) = delete;
-//
-//         public:
-//             auto operator co_await() noexcept
-//             {
-//                 const auto fnwait = +[](corof::async_variable<T> *p) -> corof::eval_poller
-//                 {
-//                     while(!p->m_var.has_value()){
-//                         co_await std::suspend_always{};
-//                     }
-//                     co_return p->m_var.value();
-//                 };
-//                 return fnwait(this). template to_awaiter<T>();
-//             }
-//     };
-//
-//     inline auto async_wait(uint64_t msec) noexcept
-//     {
-//         const auto fnwait = +[](uint64_t msec) -> corof::eval_poller
-//         {
-//             size_t count = 0;
-//             if(msec == 0){
-//                 co_await std::suspend_always{};
-//                 count++;
-//             }
-//             else{
-//                 hres_timer timer;
-//                 while(timer.diff_msec() < msec){
-//                     co_await std::suspend_always{};
-//                     count++;
-//                 }
-//             }
-//             co_return count;
-//         };
-//         return fnwait(msec).to_awaiter<size_t>();
-//     }
-//
-//     template<typename T> inline auto delay_value(uint64_t msec, T t) // how about variadic template argument
-//     {
-//         const auto fnwait = +[](uint64_t msec, T t) -> corof::eval_poller
-//         {
-//             co_await corof::async_wait(msec);
-//             co_return t;
-//         };
-//         return fnwait(msec, std::move(t)). template to_awaiter<T>();
-//     }
-// }
+namespace corof
+{
+    template<typename T> class async_variable
+    {
+        private:
+            std::optional<T> m_var;
+
+        public:
+            template<typename U = T> void assign(U && u)
+            {
+                fflassert(!m_var.has_value());
+                m_var = std::make_optional<T>(std::move(u));
+            }
+
+        public:
+            async_variable() = default;
+
+        public:
+            template<typename U    > async_variable                 (const async_variable<U> &) = delete;
+            template<typename U = T> async_variable<T> & operator = (const async_variable<U> &) = delete;
+
+        public:
+            auto operator co_await() noexcept
+            {
+                return [](corof::async_variable<T> *p) -> corof::eval_poller<T>
+                {
+                    while(!p->m_var.has_value()){
+                        co_await std::suspend_always{};
+                    }
+                    co_return p->m_var.value();
+                }(this);
+            }
+    };
+
+    inline corof::eval_poller<size_t> async_wait(uint64_t msec)
+    {
+        size_t count = 0;
+        if(msec == 0){
+            co_await std::suspend_always{};
+            count++;
+        }
+        else{
+            hres_timer timer;
+            while(timer.diff_msec() < msec){
+                co_await std::suspend_always{};
+                count++;
+            }
+        }
+        co_return count;
+    }
+}
