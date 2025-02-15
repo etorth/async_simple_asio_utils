@@ -55,9 +55,13 @@ void Actor::consumeMessages()
             std::unique_lock<std::mutex> lock(mailboxMutex);
             std::swap(messages, mailbox);
         }
-        if (messages.empty()) break;
+
+        if (messages.empty()){
+            break;
+        }
+
         for (auto& message : messages) {
-            receive(message);
+            receive(std::move(message));
         }
     }
 }
