@@ -1,16 +1,21 @@
 #include "threadpool.hpp"
 #include "actor.hpp"
 
-void ThreadPool::registerActor(std::shared_ptr<Actor> actor)
+void ThreadPool::registerActor(Actor *actor)
 {
     std::unique_lock<std::mutex> lock(actorsMutex);
     actors[actor->getAddress()] = actor;
 }
 
-std::shared_ptr<Actor> ThreadPool::getActor(uint64_t address)
+Actor *ThreadPool::getActor(int address)
 {
     std::unique_lock<std::mutex> lock(actorsMutex);
-    return actors[address];
+    if(auto p = actors.find(address); p != actors.end()){
+        return p->second;
+    }
+    else{
+        return nullptr;
+    }
 }
 
 void ThreadPool::enqueue(std::function<void()> task)
@@ -23,11 +28,11 @@ void ThreadPool::enqueue(std::function<void()> task)
     condition.notify_one();
 }
 
-void ThreadPool::scheduleActor(std::shared_ptr<Actor> actor)
+void ThreadPool::scheduleActor(Actor *actor)
 {
     enqueue([actor, this]()
     {
-        if (actor->trySetProcessing()){
+        if(actor->trySetProcessing()){
             actor->consumeMessages();
             actor->resetProcessing();
         }

@@ -18,7 +18,7 @@ class ThreadPool
         std::condition_variable condition;
         bool stop = false;
 
-        std::unordered_map<uint64_t, std::shared_ptr<Actor>> actors;
+        std::unordered_map<int, Actor *> actors;
         std::mutex actorsMutex;
 
     public:
@@ -62,8 +62,10 @@ class ThreadPool
         }
 
     public:
-        void registerActor(std::shared_ptr<Actor> actor);
-        std::shared_ptr<Actor> getActor(uint64_t address);
-        void enqueue(std::function<void()> task);
-        void scheduleActor(std::shared_ptr<Actor> actor);
+        void registerActor(Actor *);
+        Actor *getActor(int address);
+
+    public:
+        void enqueue(std::function<void()>);
+        void scheduleActor(Actor *);
 };

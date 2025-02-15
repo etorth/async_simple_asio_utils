@@ -1,21 +1,24 @@
 #include "printmessage.hpp"
 #include "actor.hpp"
 
-void Actor::send(uint64_t toAddress, Message message, std::function<void(const Message&)> callback)
+void Actor::send(int toAddress, int respID, std::string message, std::function<void(const Message&)> callback)
 {
-    auto target = pool.getActor(toAddress);
-    if (target) {
-        // If the callback is nullptr, set seqID to 0
-        if (callback == nullptr) {
-            message.seqID = 0;
-        } else {
-            // Store the callback in the hash table
-            callbacks[message.seqID] = callback;
+    if(auto target = pool.getActor(toAddress); target){
+        Message msg
+        {
+            .content = std::move(message),
+            .from = getAddress(),
+            .respID = respID,
+        };
+
+        if(callback){
+            msg.seqID = sequence++;
+            callbacks[msg.seqID] = std::move(callback);
         }
 
         {
             std::unique_lock<std::mutex> lock(target->mailboxMutex);
-            target->mailbox.push_back(message);
+            target->mailbox.push_back(std::move(msg));
         }
 
         pool.scheduleActor(target);
@@ -39,10 +42,8 @@ void Actor::receive(const Message& message)
         }
     }
 
-    // If the received message's seqID is non-zero, send a reply
     if (message.seqID != 0) {
-        Message replyMessage("Reply from Actor!", address, 0, message.seqID);
-        send(message.from, replyMessage);
+        send(message.from, message.seqID, "Reply from Actor!");
     }
 }
 
@@ -57,33 +58,6 @@ void Actor::consumeMessages()
         if (messages.empty()) break;
         for (auto& message : messages) {
             receive(message);
-        }
-    }
-}
-
-void Actor::sendMessages()
-{
-    constexpr int M = 20; // Number of actors
-    int messageCount = std::rand() % 5 + 1;
-
-    for (int i = 0; i < messageCount; ++i) {
-        uint64_t randomActorAddress;
-        do {
-            randomActorAddress = std::rand() % M + 1;
-        } while (randomActorAddress == getAddress());
-
-        int sequenceNumber = sequence++;
-        Message message("Hello from Actor!", address, sequenceNumber);
-
-        // Randomly decide whether to provide a callback or not
-        if (std::rand() % 2 == 0) {
-            send(randomActorAddress, message, [this, sequenceNumber](const Message& reply)
-            {
-                printMessage("Actor %llu received reply for sequence number %d: %s\n", getAddress(), sequenceNumber, reply.content.c_str());
-            });
-        }
-        else {
-            send(randomActorAddress, message);
         }
     }
 }

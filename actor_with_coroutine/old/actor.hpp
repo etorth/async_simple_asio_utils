@@ -13,7 +13,7 @@ class Actor
 {
     private:
         ThreadPool& pool;
-        uint64_t address;
+        int address;
         std::vector<Message> mailbox;
         std::mutex mailboxMutex;
         std::atomic<bool> isProcessing;
@@ -24,14 +24,14 @@ class Actor
         std::atomic<int> sequence{1}; // Start sequence from 1, as 0 will be used for messages that don't need a response
 
     public:
-        Actor(ThreadPool& pool, uint64_t address)
+        Actor(ThreadPool& pool, int address)
             : pool(pool)
             , address(address)
             , isProcessing(false)
             , m_msgCount(0)
         {}
 
-        uint64_t getAddress() const
+        int getAddress() const
         {
             return address;
         }
@@ -47,8 +47,7 @@ class Actor
         }
 
     public:
-        void send(uint64_t toAddress, Message message, std::function<void(const Message&)> callback = nullptr);
-        void receive(const Message& message);
+        void send(int, int, std::string, std::function<void(const Message &)> = nullptr);
+        void receive(const Message &);
         void consumeMessages();
-        void sendMessages();
 };
