@@ -77,11 +77,12 @@ void Actor::sendMessages()
 
         // Randomly decide whether to provide a callback or not
         if (std::rand() % 2 == 0) {
-            send(randomActorAddress, message, [this, sequenceNumber](const Message& reply) {
-                    printMessage("Actor %llu received reply for sequence number %d: %s\n",
-                            getAddress(), sequenceNumber, reply.content.c_str());
-                    });
-        } else {
+            send(randomActorAddress, message, [this, sequenceNumber](const Message& reply)
+            {
+                printMessage("Actor %llu received reply for sequence number %d: %s\n", getAddress(), sequenceNumber, reply.content.c_str());
+            });
+        }
+        else {
             send(randomActorAddress, message);
         }
     }
