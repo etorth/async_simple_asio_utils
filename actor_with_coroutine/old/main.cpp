@@ -16,18 +16,9 @@
 #include <cstdio>
 #include <cstdarg>
 
+#include "message.hpp"
+
 constexpr int M = 20; // Number of actors
-
-struct Message
-{
-    std::string content;
-    int from;
-    int seqID;
-    int respID;
-
-    Message(std::string content, int from, int seqID, int respID = 0)
-        : content(std::move(content)), from(from), seqID(seqID), respID(respID) {}
-};
 
 class Actor;
 class ThreadPool;
