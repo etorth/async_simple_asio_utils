@@ -53,7 +53,9 @@ void ThreadPool::scheduleActor(Actor *actor)
 {
     {
         std::unique_lock<std::mutex> lock(queueMutex);
-        if (stop) throw std::runtime_error("enqueue on stopped ThreadPool");
+        if (stop){
+            throw std::runtime_error("enqueue on stopped ThreadPool");
+        }
         pendingActors.push(actor);
     }
     condition.notify_one();
