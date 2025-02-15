@@ -18,10 +18,10 @@
 
 constexpr int M = 20; // Number of actors
 
-class Message {
-public:
+struct Message
+{
     std::string content;
-    int from; // Changed senderID to from and use int type
+    int from;
     int seqID;
     int respID;
 
