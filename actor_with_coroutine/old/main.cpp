@@ -17,22 +17,12 @@
 #include <cstdarg>
 
 #include "message.hpp"
+#include "printmessage.hpp"
 
 constexpr int M = 20; // Number of actors
 
 class Actor;
 class ThreadPool;
-
-std::mutex coutMutex; // Mutex for synchronizing printf access
-
-void print_message(const char *format, ...) {
-    std::lock_guard<std::mutex> lock(coutMutex);
-    va_list args;
-    va_start(args, format);
-    vprintf(format, args);
-    va_end(args);
-    fflush(stdout); // Flush the output buffer
-}
 
 class Actor {
 public:
@@ -45,7 +35,7 @@ public:
     void send(uint64_t toAddress, Message message, std::function<void(const Message&)> callback = nullptr);
 
     virtual void receive(const Message& message) {
-        print_message("Actor %llu received message from Actor %d with content: %s, seqID: %d, respID: %s\n",
+        printMessage("Actor %llu received message from Actor %d with content: %s, seqID: %d, respID: %s\n",
                       address, message.from, message.content.c_str(), message.seqID,
                       (message.respID != 0 ? std::to_string(message.respID).c_str() : "null"));
 
@@ -214,7 +204,7 @@ void Actor::sendMessages() {
         // Randomly decide whether to provide a callback or not
         if (std::rand() % 2 == 0) {
             send(randomActorAddress, message, [this, sequenceNumber](const Message& reply) {
-                print_message("Actor %llu received reply for sequence number %d: %s\n",
+                printMessage("Actor %llu received reply for sequence number %d: %s\n",
                               getAddress(), sequenceNumber, reply.content.c_str());
             });
         } else {
@@ -242,6 +232,6 @@ int main() {
     // Clear actors
     actors.clear();
 
-    print_message("Gracefully exiting main\n");
+    printMessage("Gracefully exiting main\n");
     return 0;
 }
