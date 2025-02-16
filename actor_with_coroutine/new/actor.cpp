@@ -1,7 +1,7 @@
 #include "printmessage.hpp"
 #include "actor.hpp"
 
-void Actor::send(int toAddress, int respID, std::string message, std::function<void(const Message&)> callback)
+MsgOptCont Actor::send(int toAddress, int respID, std::string message, bool waitResp)
 {
     if(auto target = pool.getActor(toAddress); target){
         Message msg
@@ -11,9 +11,8 @@ void Actor::send(int toAddress, int respID, std::string message, std::function<v
             .respID = respID,
         };
 
-        if(callback){
+        if(waitResp){
             msg.seqID = sequence++;
-            callbacks[msg.seqID] = std::move(callback);
         }
 
         {
@@ -22,28 +21,32 @@ void Actor::send(int toAddress, int respID, std::string message, std::function<v
         }
 
         pool.scheduleActor(target);
-    }
-}
-
-void Actor::receive(const Message& message)
-{
-    printMessage("Actor %llu received message from Actor %d with content: %s, seqID: %d, respID: %s\n", address, message.from, message.content.c_str(), message.seqID, (message.respID != 0 ? std::to_string(message.respID).c_str() : "null"));
-
-    m_lastMsg = message;
-    m_msgCount++;
-
-    if (message.respID != 0) {
-        auto it = callbacks.find(message.respID);
-        if (it != callbacks.end()) {
-            it->second(m_lastMsg.value());
-            callbacks.erase(it);
-        } else {
-            throw std::runtime_error("Callback not found for response ID: " + std::to_string(message.respID));
+        if(waitResp){
+            co_return co_await MsgAwaitable{this, msg.seqID};
+        }
+        else{
+            co_return std::nullopt;
         }
     }
 
-    if (message.seqID != 0) {
-        send(message.from, message.seqID, "Reply from Actor!");
+    co_return Message
+    {
+        .content = "No actor found",
+    };
+}
+
+void Actor::receive(const Message& msg)
+{
+    printMessage("Actor %llu received message from Actor %d with content: %s, seqID: %d, respID: %s\n", address, msg.from, msg.content.c_str(), msg.seqID, (msg.respID != 0 ? std::to_string(msg.respID).c_str() : "null"));
+
+    m_lastMsg = msg;
+    m_msgCount++;
+
+    if(msg.respID > 0){
+        onContMessage(msg);
+    }
+    else if(auto h = onFreeMessage(msg).m_coro; !h.done()){
+        m_respHandlerList.emplace(msg.seqID, h);
     }
 }
 
@@ -63,5 +66,40 @@ void Actor::consumeMessages()
         for (auto& message : messages) {
             receive(std::move(message));
         }
+    }
+}
+
+MsgOptCont Actor::onFreeMessage(const Message &msg)
+{
+    m_lastMsg = msg;
+    m_msgCount++;
+
+    if(msg.seqID > 0){
+        if(msg.content == "?"){
+            auto askMsg = co_await send(msg.from, 0, "ask");
+            co_return Message
+            {
+                .content = std::string("Reply ") + askMsg.value().content,
+                .from = getAddress(),
+                .respID = msg.seqID,
+            };
+        }
+        else{
+            co_return Message
+            {
+                .content = "Reply",
+                .from = getAddress(),
+                .respID = msg.seqID,
+            };
+        }
+    }
+    co_return std::nullopt;
+}
+
+void Actor::onContMessage(const Message &msg)
+{
+    if(auto p = m_respHandlerList.find(msg.respID); p != m_respHandlerList.end()){
+        p->second.resume();
+        m_respHandlerList.erase(p);
     }
 }

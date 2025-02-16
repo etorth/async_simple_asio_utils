@@ -11,6 +11,7 @@
 #include "printmessage.hpp"
 #include "threadpool.hpp"
 #include "actor.hpp"
+#include "sync_wait.hpp"
 
 constexpr int M = 20; // Number of actors
 std::unique_ptr<ThreadPool> pool;
@@ -26,21 +27,22 @@ int randReciever(int from)
     return 0;
 }
 
-void randSendMessage(int from)
+MsgOptCont randSendMessage()
 {
-    int messageCount = std::rand() % 5 + 1;
-    for (int i = 0; i < messageCount; ++i) {
-        int recvAddr = randReciever(from);
-        std::string message("Hello from Actor!");
+    for(int from = 0; from < M; ++from){
+        int messageCount = std::rand() % 5 + 1;
+        for (int i = 0; i < messageCount; ++i) {
+            int recvAddr = randReciever(from);
+            std::string message("Hello from Actor!");
 
-        if (std::rand() % 2 == 0) {
-            actors[from]->send(recvAddr, 0, message, [from](const Message& reply)
-            {
+            if (std::rand() % 2 == 0) {
+                auto replyOpt = co_await actors[from]->send(recvAddr, 0, message, true);
+                auto reply = replyOpt.value();
                 printMessage("Actor %llu received reply for sequence number %d: %s\n", actors[from]->getAddress(), reply.respID, reply.content.c_str());
-            });
-        }
-        else {
-            actors[from]->send(recvAddr, 0, message);
+            }
+            else {
+                co_await actors[from]->send(recvAddr, 0, message);
+            }
         }
     }
 }
@@ -55,9 +57,8 @@ int main()
         pool->registerActor(actors.back().get());
     }
 
-    for(int i = 0; i < M; ++i){
-        randSendMessage(i);
-    }
+    auto t = randSendMessage();
+    sync_wait(t);
 
     std::this_thread::sleep_for(std::chrono::seconds(1)); // Let the tasks finish
 
