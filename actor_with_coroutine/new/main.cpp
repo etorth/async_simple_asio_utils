@@ -14,6 +14,8 @@
 #include "sync_wait.hpp"
 
 constexpr int M = 20; // Number of actors
+constexpr int N =  5; // Number of messages
+
 std::unique_ptr<ThreadPool> pool;
 std::vector<std::unique_ptr<Actor>> actors;
 
@@ -30,7 +32,7 @@ int randReciever(int from)
 MsgOptCont randSendMessage()
 {
     for(int from = 0; from < M; ++from){
-        int messageCount = std::rand() % 5 + 1;
+        int messageCount = std::rand() % N + 1;
         for (int i = 0; i < messageCount; ++i) {
             int recvAddr = randReciever(from);
             std::string message("Hello from Actor!");

@@ -51,7 +51,7 @@ struct MsgOptCont
 
         void await_suspend(std::coroutine_handle<>) noexcept
         {
-            //
+
         }
 
         std::optional<Message> await_resume() noexcept
