@@ -34,8 +34,11 @@ ThreadPool::ThreadPool(size_t numThreads)
 
 void ThreadPool::registerActor(Actor *actor)
 {
-    std::unique_lock<std::mutex> lock(actorsMutex);
-    actors[actor->getAddress()] = actor;
+    {
+        std::unique_lock<std::mutex> lock(actorsMutex);
+        actors[actor->getAddress()] = actor;
+    }
+    scheduleActor(actor);
 }
 
 Actor *ThreadPool::getActor(int address)

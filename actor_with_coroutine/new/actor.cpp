@@ -50,6 +50,10 @@ void Actor::receive(const Message& msg)
 
 void Actor::consumeMessages()
 {
+    if(!doneInitCall){
+        initCall();
+    }
+
     while (true) {
         std::vector<Message> messages;
         {
@@ -99,4 +103,28 @@ void Actor::onContMessage(const Message &msg)
         p->second.resume();
         m_respHandlerList.erase(p);
     }
+}
+
+void Actor::initCall()
+{
+    auto t = initCallCoroutine();
+    MsgOptContAwaitable(t.handle).await_suspend(std::noop_coroutine());
+}
+
+MsgOptCont Actor::initCallCoroutine()
+{
+    for(int recvAddr: {getAddress() + 1, getAddress() - 1}){
+        std::string message("Hello from Actor!");
+
+        if (std::rand() % 2 == 0) {
+            auto replyOpt = co_await send(recvAddr, 0, message, true);
+            auto reply = replyOpt.value();
+            printMessage("Actor %llu received reply for sequence number %d: %s\n", getAddress(), reply.respID, reply.content.c_str());
+        }
+        else {
+            co_await send(recvAddr, 0, message);
+        }
+    }
+
+    doneInitCall = true;
 }

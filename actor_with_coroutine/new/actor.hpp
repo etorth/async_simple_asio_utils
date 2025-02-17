@@ -24,6 +24,9 @@ class Actor
         std::atomic<int> sequence{1}; // Start sequence from 1, as 0 will be used for messages that don't need a response
 
     private:
+        bool doneInitCall = false;
+
+    private:
         std::optional<Message> m_lastMsg {};
         size_t m_msgCount = 0;
 
@@ -94,4 +97,8 @@ class Actor
     public:
         MsgOptCont onFreeMessage(const Message &);
         void       onContMessage(const Message &);
+
+    public:
+        void initCall();
+        MsgOptCont initCallCoroutine();
 };
