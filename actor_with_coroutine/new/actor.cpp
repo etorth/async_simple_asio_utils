@@ -52,6 +52,7 @@ void Actor::consumeMessages()
 {
     if(!doneInitCall){
         initCall();
+        doneInitCall = true;
     }
 
     while (true) {
@@ -107,10 +108,7 @@ void Actor::onContMessage(const Message &msg)
 
 void Actor::initCall()
 {
-    auto t = initCallCoroutine();
-
-    t.handle.promise().actor = this;
-    MsgOptContAwaitable(t.handle).await_suspend(std::noop_coroutine());
+    MsgOptContAwaitable(initCallCoroutine().handle).await_suspend(std::noop_coroutine());
 }
 
 MsgOptCont Actor::initCallCoroutine()
@@ -127,6 +125,4 @@ MsgOptCont Actor::initCallCoroutine()
             co_await send(recvAddr, 0, message);
         }
     }
-
-    doneInitCall = true;
 }

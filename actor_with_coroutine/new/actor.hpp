@@ -45,7 +45,7 @@ class Actor
     private:
         struct SendMsgAwaitable
         {
-            Actor * actor;
+            Actor *actor;
             int seqID;
 
             bool await_ready() const
@@ -55,7 +55,6 @@ class Actor
 
             void await_suspend(std::coroutine_handle<MsgOptCont::promise_type> handle)
             {
-                handle.promise().actor = actor;
                 actor->m_respHandlerList.emplace(seqID, handle);
             }
 
