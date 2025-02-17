@@ -3,6 +3,20 @@
 
 MsgOptCont Actor::send(int toAddress, int respID, std::string message, bool waitResp)
 {
+    struct AssignSelfAwaiter
+    {
+        Actor *self;
+        bool await_ready() const noexcept { return false; }
+        bool await_suspend(std::coroutine_handle<MsgOptContPromise> h) noexcept
+        {
+            h.promise().actor = self;
+            return false;
+        }
+        void await_resume() noexcept {}
+    };
+
+    co_await AssignSelfAwaiter{this};
+
     if(auto target = pool.getActor(toAddress); target){
         Message msg
         {
