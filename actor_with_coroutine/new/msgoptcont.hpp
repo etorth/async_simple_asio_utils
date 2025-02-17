@@ -19,9 +19,9 @@ struct MsgOptContPromise
     Actor *actor;
     std::coroutine_handle<> continuation;
 
-    // template<typename... Args> MsgOptContPromise(Actor *self, Args && ...)
-    //     : actor(self)
-    // {}
+    template<typename... Args> MsgOptContPromise(Actor &self, Args && ...)
+        : actor(&self)
+    {}
 
     MsgOptCont get_return_object() noexcept;
     void return_value(std::optional<Message>);
