@@ -119,10 +119,16 @@ MsgOptCont Actor::initCallCoroutine()
         if (std::rand() % 2 == 0) {
             auto replyOpt = co_await send(recvAddr, 0, message, true);
             auto reply = replyOpt.value();
-            printMessage("Actor %llu received reply for sequence number %d: %s\n", getAddress(), reply.respID, reply.content.c_str());
+            printMessage("Actor %llu send: %s, seqID %d to %d, received reply from %d: %s\n", getAddress(), message.c_str(), reply.respID, recvAddr, reply.from, reply.content.c_str());
         }
         else {
-            co_await send(recvAddr, 0, message);
+            auto replyOpt = co_await send(recvAddr, 0, message);
+            if(replyOpt.has_value()){
+                printMessage("Actor %llu send: %s, to %d, received unexpected message: %s\n", getAddress(), message.c_str(), recvAddr, replyOpt.value().content.c_str());
+            }
+            else{
+                printMessage("Actor %llu send: %s, to %d\n", getAddress(), message.c_str(), recvAddr);
+            }
         }
     }
 }

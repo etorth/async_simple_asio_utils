@@ -13,7 +13,7 @@
 #include "actor.hpp"
 #include "sync_wait.hpp"
 
-constexpr int K = 1; // Number of threads
+constexpr int K = 4; // Number of threads
 constexpr int M = 20; // Number of actors
 
 std::unique_ptr<ThreadPool> pool;
