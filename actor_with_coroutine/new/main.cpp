@@ -63,7 +63,9 @@ int main()
     // auto t = randSendMessage();
     // sync_wait(t);
 
-    std::this_thread::sleep_for(std::chrono::seconds(1)); // Let the tasks finish
+    // std::this_thread::sleep_for(std::chrono::seconds(1)); // Let the tasks finish
+
+    while(1);
 
     actors.clear();
     pool.reset();

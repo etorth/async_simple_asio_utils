@@ -108,12 +108,14 @@ void Actor::onContMessage(const Message &msg)
 void Actor::initCall()
 {
     auto t = initCallCoroutine();
+
+    t.handle.promise().actor = this;
     MsgOptContAwaitable(t.handle).await_suspend(std::noop_coroutine());
 }
 
 MsgOptCont Actor::initCallCoroutine()
 {
-    for(int recvAddr: {getAddress() + 1, getAddress() - 1}){
+    for(int recvAddr: {getAddress() - 1, getAddress() + 1}){
         std::string message("Hello from Actor!");
 
         if (std::rand() % 2 == 0) {
