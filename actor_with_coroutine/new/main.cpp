@@ -13,16 +13,15 @@
 #include "actor.hpp"
 #include "sync_wait.hpp"
 
-constexpr int K = 4; // Number of threads
 constexpr int M = 20; // Number of actors
 
 std::unique_ptr<ThreadPool> pool;
 std::vector<std::unique_ptr<Actor>> actors;
 
-int main()
+int main(int argc, char **argv)
 {
     std::srand(std::time(nullptr));
-    pool = std::make_unique<ThreadPool>(K);
+    pool = std::make_unique<ThreadPool>(argc > 1 ? std::stoi(argv[1]) : 4);
 
     for (int i = 0; i < M; ++i) {
         actors.push_back(std::make_unique<Actor>(*pool, i));

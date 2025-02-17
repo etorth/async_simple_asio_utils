@@ -43,8 +43,9 @@ void Actor::receive(const Message& msg)
     if(msg.respID > 0){
         onContMessage(msg);
     }
-    else if(auto h = onFreeMessage(msg).handle; !h.done()){
-        m_respHandlerList.emplace(msg.seqID, h);
+    else{
+        MsgOptContAwaitable(onFreeMessage(msg).handle).await_suspend(std::noop_coroutine());
+
     }
 }
 
@@ -72,33 +73,23 @@ void Actor::consumeMessages()
     }
 }
 
-MsgOptCont Actor::onFreeMessage(const Message &msg)
+MsgOptCont Actor::onFreeMessage(Message msg)
 {
     updateLastMsg(msg);
 
     if(msg.seqID > 0){
         if(msg.content == "?"){
             auto askMsg = co_await send(msg.from, 0, "ASK BACK");
-            co_return Message
-            {
-                .content = std::string("Reply ") + askMsg.value().content,
-                .from = getAddress(),
-                .respID = msg.seqID,
-            };
+            co_await send(msg.from, msg.seqID, std::string("Reply ") + askMsg.value().content);
         }
         else{
-            co_return Message
-            {
-                .content = "Reply",
-                .from = getAddress(),
-                .respID = msg.seqID,
-            };
+            co_await send(msg.from, msg.seqID, "Reply");
         }
     }
     co_return std::nullopt;
 }
 
-void Actor::onContMessage(const Message &msg)
+void Actor::onContMessage(Message msg)
 {
     if(auto p = m_respHandlerList.find(msg.respID); p != m_respHandlerList.end()){
         p->second.resume();

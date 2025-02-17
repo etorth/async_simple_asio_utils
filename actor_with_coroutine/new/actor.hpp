@@ -94,8 +94,8 @@ class Actor
         void consumeMessages();
 
     public:
-        MsgOptCont onFreeMessage(const Message &);
-        void       onContMessage(const Message &);
+        MsgOptCont onFreeMessage(Message);
+        void       onContMessage(Message);
 
     public:
         void initCall();
