@@ -19,6 +19,7 @@ void MsgOptContPromise::return_value(std::optional<Message> msg)
 void MsgOptContAwaitable::await_suspend(std::coroutine_handle<> h) noexcept
 {
     handle.promise().continuation = h;
+    handle.resume();
 }
 
 std::optional<Message> MsgOptContAwaitable::await_resume() noexcept
