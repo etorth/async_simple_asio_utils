@@ -22,7 +22,7 @@ MsgOptCont Actor::send(int toAddress, int respID, std::string message, bool wait
 
         pool.scheduleActor(target);
         if(waitResp){
-            co_return co_await MsgAwaitable{this, msg.seqID};
+            co_return co_await SendMsgAwaitable{this, msg.seqID};
         }
         else{
             co_return std::nullopt;
@@ -38,14 +38,12 @@ MsgOptCont Actor::send(int toAddress, int respID, std::string message, bool wait
 void Actor::receive(const Message& msg)
 {
     printMessage("Actor %llu received message from Actor %d with content: %s, seqID: %d, respID: %s\n", address, msg.from, msg.content.c_str(), msg.seqID, (msg.respID != 0 ? std::to_string(msg.respID).c_str() : "null"));
-
-    m_lastMsg = msg;
-    m_msgCount++;
+    updateLastMsg(msg);
 
     if(msg.respID > 0){
         onContMessage(msg);
     }
-    else if(auto h = onFreeMessage(msg).m_coro; !h.done()){
+    else if(auto h = onFreeMessage(msg).handle; !h.done()){
         m_respHandlerList.emplace(msg.seqID, h);
     }
 }
@@ -71,8 +69,7 @@ void Actor::consumeMessages()
 
 MsgOptCont Actor::onFreeMessage(const Message &msg)
 {
-    m_lastMsg = msg;
-    m_msgCount++;
+    updateLastMsg(msg);
 
     if(msg.seqID > 0){
         if(msg.content == "?"){

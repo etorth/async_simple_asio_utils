@@ -1,66 +1,65 @@
 #pragma once
 #include <coroutine>
+#include <optional>
 #include "message.hpp"
+
+class Actor;
+struct MsgOptCont;
+
+struct MsgOptContPromise;
+struct MsgOptContPromiseFinalAwaiter
+{
+    bool await_ready() const noexcept { return false; }
+    void await_suspend(std::coroutine_handle<MsgOptContPromise>) noexcept;
+    void await_resume() noexcept {}
+};
+
+struct MsgOptContPromise
+{
+    Actor *actor;
+    std::coroutine_handle<> continuation;
+
+    // template<typename... Args> MsgOptContPromise(Actor *self, Args && ...)
+    //     : actor(self)
+    // {}
+
+    MsgOptCont get_return_object() noexcept;
+    void return_value(std::optional<Message>);
+
+    std::suspend_always         initial_suspend() const noexcept { return {}; }
+    MsgOptContPromiseFinalAwaiter final_suspend() const noexcept { return {}; }
+
+
+    void unhandled_exception()
+    {
+        std::terminate();
+    }
+};
+
+struct MsgOptContAwaitable
+{
+    std::coroutine_handle<MsgOptContPromise> handle;
+
+    bool await_ready() const noexcept
+    {
+        return false;
+    }
+
+    void await_suspend(std::coroutine_handle<> h) noexcept;
+    std::optional<Message> await_resume() noexcept;
+};
 
 struct MsgOptCont
 {
-    struct promise_type
-    {
-        std::optional<Message> m_msg;
+    using promise_type = MsgOptContPromise;
+    std::coroutine_handle<promise_type> handle;
 
-        MsgOptCont get_return_object() noexcept
-        {
-            return std::coroutine_handle<promise_type>::from_promise(*this);
-        }
-
-        std::suspend_always initial_suspend() const noexcept
-        {
-            return {};
-        }
-
-        std::suspend_always final_suspend() const noexcept
-        {
-            return {};
-        }
-
-        void return_value(std::optional<Message> msg)
-        {
-            m_msg = std::move(msg);
-        }
-
-        void unhandled_exception()
-        {
-            std::terminate();
-        }
-    };
-
-    std::coroutine_handle<promise_type> m_coro;
-
-    MsgOptCont(std::coroutine_handle<promise_type> coro)
-        : m_coro(coro)
+    MsgOptCont(std::coroutine_handle<promise_type> h)
+        : handle(h)
     {}
 
-    struct MsgAwaitable
+    MsgOptContAwaitable operator co_await() noexcept
     {
-        MsgOptCont* m_optCont;
-
-        bool await_ready() const noexcept
-        {
-            return false;
-        }
-
-        void await_suspend(std::coroutine_handle<>) noexcept
-        {
-        }
-
-        std::optional<Message> await_resume() noexcept
-        {
-            return m_optCont->m_coro.promise().m_msg;
-        }
-    };
-
-    MsgAwaitable operator co_await() noexcept
-    {
-        return {this};
+        return {handle};
     }
 };

@@ -21,12 +21,26 @@ class Actor
         std::unordered_map<int, std::function<void(const Message&)>> callbacks;
         std::unordered_map<int, std::coroutine_handle<MsgOptCont::promise_type>> m_respHandlerList;
 
-        std::optional<Message> m_lastMsg;
-        size_t m_msgCount;
         std::atomic<int> sequence{1}; // Start sequence from 1, as 0 will be used for messages that don't need a response
 
     private:
-        struct MsgAwaitable
+        std::optional<Message> m_lastMsg {};
+        size_t m_msgCount = 0;
+
+    public:
+        void updateLastMsg(std::optional<Message> msg)
+        {
+            m_lastMsg = std::move(msg);
+            m_msgCount++;
+        }
+
+        std::optional<Message> getLastMsg() const
+        {
+            return m_lastMsg;
+        }
+
+    private:
+        struct SendMsgAwaitable
         {
             Actor * actor;
             int seqID;
@@ -38,6 +52,7 @@ class Actor
 
             void await_suspend(std::coroutine_handle<MsgOptCont::promise_type> handle)
             {
+                handle.promise().actor = actor;
                 actor->m_respHandlerList.emplace(seqID, handle);
             }
 
@@ -52,7 +67,6 @@ class Actor
             : pool(pool)
             , address(address)
             , m_processing(false)
-            , m_msgCount(0)
         {}
 
         int getAddress() const
