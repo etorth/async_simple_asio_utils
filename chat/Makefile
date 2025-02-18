@@ -1,4 +1,6 @@
 all: chat_server chat_client
+clean:
+	rm -f chat_server chat_client
 
 chat_server: chat_server.cpp
 	g++-14 -std=c++26 -pthread -o chat_server chat_server.cpp
